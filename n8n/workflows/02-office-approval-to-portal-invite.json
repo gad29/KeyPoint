@@ -1,0 +1,250 @@
+{
+  "name": "KeyPoint / Office approval -> portal invite generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/office-approval",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "0ecc38a9-5530-443a-a28c-1074d2406010",
+      "name": "Office Approval Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst body = $json.body ?? $json;\nfor (const field of ['caseId', 'caseRecordId', 'leadName', 'phone']) {\n  if (!body[field]) throw new Error(`Missing required field: ${field}`);\n}\nconst now = new Date().toISOString();\nreturn [{ json: {\n  ...body,\n  now,\n  inviteRequest: { caseId: body.caseId },\n  casePatch: {\n    records: [{\n      id: body.caseRecordId,\n      fields: {\n        'Current stage': 'portal-activated',\n        'Client portal status': 'invited',\n        'Assigned staff': body.assignedTo || '',\n      }\n    }]\n  },\n  clientPatch: body.clientRecordId ? {\n    records: [{\n      id: body.clientRecordId,\n      fields: {\n        'Portal invited at': now,\n      }\n    }]\n  } : null,\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [body.caseId],\n        'Actor': body.approvedBy || 'office',\n        'Event type': 'portal_invite_generated',\n        'Summary': `Portal invite approved for ${body.caseId}`,\n        'Source system': 'n8n',\n        'Timestamp': now,\n      }\n    }]\n  }\n}}];\n"
+      },
+      "id": "2c96ae69-f2de-422e-a4fe-41ddccd67c9a",
+      "name": "Build Portal Activation Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        530,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.KEYPOINT_APP_BASE_URL}}/api/invites",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.inviteRequest }}"
+      },
+      "id": "af238fca-6bba-4554-9f6d-095d3cf137de",
+      "name": "Generate Portal Invite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        830,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_CASES_TABLE || \"Cases\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.casePatch }}"
+      },
+      "id": "62c0a0bd-3c3b-4c95-9163-1ab5d7415dc6",
+      "name": "Update Case Portal Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1110,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_CLIENTS_TABLE || \"Clients\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.clientPatch || { records: [] } }}"
+      },
+      "id": "d660ed03-1262-468c-bf8e-b7b0aafe819e",
+      "name": "Update Client Invite Timestamp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1110,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.KEYPOINT_CLIENT_NOTIFY_WEBHOOK_URL}}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { caseId: $json.caseId, leadName: $json.leadName, phone: $json.phone, preferredLanguage: $json.preferredLanguage || \"he\", portalUrl: $(\"Generate Portal Invite\").first().json.portalUrl, template: \"portal_invite\" } }}"
+      },
+      "id": "09a1af23-e9f5-4f08-9609-827a6044e0ea",
+      "name": "Send Client Invite Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.activityLogCreate }}"
+      },
+      "id": "91427086-0e8d-46dc-9315-41551169c4f6",
+      "name": "Write Activation Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Office Approval Webhook": {
+      "main": [
+        [
+          {
+            "node": "Build Portal Activation Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Portal Activation Payload": {
+      "main": [
+        [
+          {
+            "node": "Generate Portal Invite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Portal Invite": {
+      "main": [
+        [
+          {
+            "node": "Update Case Portal Status",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Client Invite Timestamp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Client Invite Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Client Invite Notification": {
+      "main": [
+        [
+          {
+            "node": "Write Activation Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "versionId": "62f92809-f1bb-43b2-a1ed-11561b49a1e3",
+  "id": "b914756a-535d-4294-a68a-4648f424edf7",
+  "tags": []
+}

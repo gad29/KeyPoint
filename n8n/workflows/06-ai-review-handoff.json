@@ -1,0 +1,201 @@
+{
+  "name": "KeyPoint / AI review handoff",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/ai-review-handoff",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "905a8da9-730d-433c-b803-7f5741c36f1b",
+      "name": "AI Review Handoff Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst body = $json.body ?? $json;\nif (!body.caseId) throw new Error('caseId is required');\nconst now = new Date().toISOString();\nconst sanitized = {\n  caseId: body.caseId,\n  caseType: body.caseType,\n  borrowerProfiles: body.borrowerProfiles || [],\n  stage: body.stage,\n  incomeMonthly: body.incomeMonthly,\n  obligationsMonthly: body.obligationsMonthly,\n  requestedMortgageAmount: body.requestedMortgageAmount,\n  ltv: body.ltv,\n  documentSummaries: body.documentSummaries || [],\n  bankStatus: body.bankStatus || [],\n  notes: body.notes || '',\n};\nreturn [{ json: {\n  now,\n  caseId: body.caseId,\n  reviewRequest: sanitized,\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [body.caseId],\n        'Actor': body.triggeredBy || 'n8n',\n        'Event type': 'ai_review_sent',\n        'Summary': `AI review requested for ${body.caseId}`,\n        'Source system': 'n8n',\n        'Timestamp': now,\n      }\n    }]\n  }\n}}];\n"
+      },
+      "id": "2923b4ea-517e-41e8-9573-764cb8e22852",
+      "name": "Anonymize Case Package",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.KEYPOINT_AI_REVIEW_WEBHOOK_URL}}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.reviewRequest }}"
+      },
+      "id": "c2b91d0a-cb9f-466a-9609-43204687c0ab",
+      "name": "Send to AI Review Service",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\n        const result = $json;\n        const request = $('Anonymize Case Package').first().json;\n        return [{ json: {\n          aiReviewCreate: {\n            records: [{\n              fields: {\n                'Case link': [request.caseId],\n                'Triggered by': 'n8n',\n                'Review status': result.status || 'completed',\n                'Findings summary': result.summary || '',\n                'Missing items found': Array.isArray(result.missingItems) ? result.missingItems.join('\n') : '',\n                'Risk flags': Array.isArray(result.riskFlags) ? result.riskFlags.join(', ') : '',\n                'Suggested next steps': Array.isArray(result.nextSteps) ? result.nextSteps.join('\n') : '',\n              }\n            }]\n          }\n        }}];\n"
+      },
+      "id": "5146e2cd-c5eb-4efd-bd5e-a6bcd75e3d29",
+      "name": "Build AI Review Airtable Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_AI_REVIEWS_TABLE || \"AI reviews\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.aiReviewCreate }}"
+      },
+      "id": "4f959bb1-89b6-4863-9fc8-dceb258593d1",
+      "name": "Write AI Review Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1450,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $(\"Anonymize Case Package\").first().json.activityLogCreate }}"
+      },
+      "id": "53b30bc5-e800-465d-b4e5-2ea19626e0fc",
+      "name": "Write AI Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1450,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "AI Review Handoff Webhook": {
+      "main": [
+        [
+          {
+            "node": "Anonymize Case Package",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anonymize Case Package": {
+      "main": [
+        [
+          {
+            "node": "Send to AI Review Service",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send to AI Review Service": {
+      "main": [
+        [
+          {
+            "node": "Build AI Review Airtable Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Review Airtable Record": {
+      "main": [
+        [
+          {
+            "node": "Write AI Review Record",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Write AI Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "versionId": "7d1a84f8-5a1f-411b-945a-cff5ed3e51c8",
+  "id": "fe07d699-a6df-4e7a-843f-3873779cacd9",
+  "tags": []
+}

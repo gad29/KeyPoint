@@ -1,0 +1,260 @@
+{
+  "name": "KeyPoint / Fillout intake -> Airtable case + client creation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/fillout-intake",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "e7f32909-f1bd-463f-84d3-f8a621c5cf8e",
+      "name": "Fillout Intake Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst body = $json.body ?? $json;\nconst required = ['submissionId', 'leadName', 'phone', 'caseType'];\nconst missing = required.filter((key) => !body[key]);\nif (missing.length) {\n  throw new Error(`Missing Fillout fields: ${missing.join(', ')}`);\n}\nconst borrowerProfiles = Array.isArray(body.borrowerProfiles) ? body.borrowerProfiles : [body.borrowerProfiles].filter(Boolean);\nconst bankTargets = Array.isArray(body.bankTargets) ? body.bankTargets : String(body.bankTargets || '').split(',').map((x) => x.trim()).filter(Boolean);\nconst catalog = [\n  { code: 'id-card', labelEn: 'ID card' },\n  { code: 'advisor-authorization', labelEn: 'Advisor authorization letter' },\n  { code: 'bank-statements-3m', labelEn: 'Bank statements - last 3 months' },\n  { code: 'loan-summary', labelEn: 'Existing loan summary' },\n  { code: 'tabu-extract', labelEn: 'Land registry extract' },\n];\nif (borrowerProfiles.includes('salaried')) catalog.push({ code: 'payslips-3m', labelEn: 'Last 3 payslips' });\nif (borrowerProfiles.includes('self-employed')) catalog.push({ code: 'accountant-confirmation', labelEn: 'CPA confirmation' });\nif (borrowerProfiles.includes('student')) catalog.push({ code: 'study-confirmation', labelEn: 'Study confirmation' });\nif (borrowerProfiles.includes('benefits')) catalog.push({ code: 'benefits-confirmation', labelEn: 'Benefits confirmation' });\nif (['purchase-single-dwelling','purchase-replacement-dwelling','purchase-investment-dwelling','discounted-program'].includes(body.caseType)) {\n  catalog.push({ code: 'sale-agreement', labelEn: 'Sale agreement' });\n}\nif (body.caseType === 'renovation') catalog.push({ code: 'renovation-quote', labelEn: 'Renovation quote' });\n\nconst now = new Date().toISOString();\nconst caseId = body.caseId || `CASE-${String(Date.now()).slice(-6)}`;\nconst lead = body.leadName;\nreturn [{ json: {\n  raw: body,\n  caseId,\n  now,\n  officeAlert: {\n    caseId,\n    leadName: lead,\n    phone: body.phone,\n    caseType: body.caseType,\n    borrowerProfiles,\n    bankTargets,\n    message: `New Fillout intake for ${lead} (${caseId}) is ready for office review.`\n  },\n  clientUpsert: {\n    performUpsert: { fieldsToMergeOn: ['Client ID'] },\n    records: [{\n      fields: {\n        'Client ID': body.clientId || `CLIENT-${String(Date.now()).slice(-6)}`,\n        'Full name': lead,\n        'WhatsApp number': body.phone,\n        'Email': body.email || '',\n        'Preferred language': body.preferredLanguage || 'he',\n      }\n    }]\n  },\n  caseUpsert: {\n    performUpsert: { fieldsToMergeOn: ['Case ID'] },\n    records: [{\n      fields: {\n        'Case ID': caseId,\n        'Lead name': lead,\n        'Spouse name': body.spouseName || '',\n        'Phone': body.phone,\n        'Email': body.email || '',\n        'Case type': body.caseType,\n        'Borrower profiles': borrowerProfiles,\n        'Current stage': 'intake-submitted',\n        'Assigned staff': body.assignedTo || '',\n        'Missing items count': catalog.length,\n        'Client portal status': 'not-invited',\n        'Fillout submission id': body.submissionId,\n        'Notes': body.notes || '',\n      }\n    }]\n  },\n  caseDocumentsCreate: {\n    records: catalog.map((doc) => ({\n      fields: {\n        'Case link': [caseId],\n        'Document code': doc.code,\n        'Required?': true,\n        'Status': 'not-uploaded',\n        'Review notes': '',\n      }\n    }))\n  },\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [caseId],\n        'Actor': 'n8n',\n        'Event type': 'fillout_intake_received',\n        'Summary': `Fillout intake received for ${lead}`,\n        'Source system': 'Fillout',\n        'Timestamp': now,\n      }\n    }]\n  }\n}}];\n"
+      },
+      "id": "4c55ff07-9075-4064-936d-065fb6ad7c58",
+      "name": "Normalize Intake Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_CLIENTS_TABLE || \"Clients\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.clientUpsert }}"
+      },
+      "id": "3d925bd3-4645-4741-b289-2b7cdc16df88",
+      "name": "Upsert Client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_CASES_TABLE || \"Cases\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.caseUpsert }}"
+      },
+      "id": "35027627-1ab6-4365-8f72-88828f172fd5",
+      "name": "Upsert Case",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_CASE_DOCUMENTS_TABLE || \"Case documents\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.caseDocumentsCreate }}"
+      },
+      "id": "dbdbe408-dbf8-4bef-92e7-1c616c8768d9",
+      "name": "Seed Case Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1090,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.activityLogCreate }}"
+      },
+      "id": "0bfcdf05-5842-4cd9-9fc1-1952c887e2c1",
+      "name": "Create Activity Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.KEYPOINT_OFFICE_NOTIFY_WEBHOOK_URL}}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.officeAlert }}"
+      },
+      "id": "d10022d6-7cb7-4b67-8b4a-c78cafde2760",
+      "name": "Notify Office",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Fillout Intake Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Intake Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Intake Payload": {
+      "main": [
+        [
+          {
+            "node": "Upsert Client",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upsert Case",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Case": {
+      "main": [
+        [
+          {
+            "node": "Seed Case Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seed Case Documents": {
+      "main": [
+        [
+          {
+            "node": "Create Activity Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Activity Log": {
+      "main": [
+        [
+          {
+            "node": "Notify Office",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "versionId": "2008dd10-bde0-4ebc-8a95-98313e48a091",
+  "id": "379f138d-7a57-4164-9f68-1c8ccdf6c912",
+  "tags": []
+}

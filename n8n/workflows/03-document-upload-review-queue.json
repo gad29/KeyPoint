@@ -1,0 +1,214 @@
+{
+  "name": "KeyPoint / Document upload review queue",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/document-upload-review",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "c848c5b2-344e-4038-be95-c3007d61a4f4",
+      "name": "Document Upload Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst body = $json.body ?? $json;\nfor (const field of ['caseId', 'caseDocumentRecordId', 'documentCode', 'fileUrl']) {\n  if (!body[field]) throw new Error(`Missing required field: ${field}`);\n}\nconst now = new Date().toISOString();\nconst reviewSummary = body.ocrSummary || `Queued ${body.documentCode} for secretary review`;\nreturn [{ json: {\n  ...body,\n  now,\n  caseDocumentPatch: {\n    records: [{\n      id: body.caseDocumentRecordId,\n      fields: {\n        'Status': 'under-review',\n        'Uploaded file URL': body.fileUrl,\n        'OCR summary': reviewSummary,\n        'Review notes': body.reviewNotes || '',\n      }\n    }]\n  },\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [body.caseId],\n        'Actor': 'n8n',\n        'Event type': 'document_uploaded',\n        'Summary': `${body.documentCode} uploaded and queued for review`,\n        'Source system': 'portal',\n        'Timestamp': now,\n      }\n    }]\n  },\n  officeAlert: {\n    caseId: body.caseId,\n    documentCode: body.documentCode,\n    fileUrl: body.fileUrl,\n    reviewStatus: 'under-review',\n    message: `${body.documentCode} is waiting in the document review queue for case ${body.caseId}.`\n  }\n}}];\n"
+      },
+      "id": "9bb1c1e2-5738-495a-b6c6-98471cb6c59b",
+      "name": "Prepare Review Queue Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_CASE_DOCUMENTS_TABLE || \"Case documents\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.caseDocumentPatch }}"
+      },
+      "id": "2a701b61-6c34-4204-a915-4e7c67ac756e",
+      "name": "Update Case Document Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.activityLogCreate }}"
+      },
+      "id": "7efba367-0457-4acf-8f0d-8ef183cd90a8",
+      "name": "Write Upload Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.KEYPOINT_OFFICE_NOTIFY_WEBHOOK_URL}}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.officeAlert }}"
+      },
+      "id": "d684db15-48f0-44e3-a0fc-2723d610683a",
+      "name": "Notify Review Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.KEYPOINT_OCR_WEBHOOK_URL}}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { caseId: $json.caseId, documentCode: $json.documentCode, fileUrl: $json.fileUrl, languageHint: $json.languageHint || \"he\" } }}"
+      },
+      "id": "deb2111c-ac11-4420-9b6c-8cb335f44e96",
+      "name": "Optional OCR Handoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        840,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Document Upload Review Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Review Queue Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Review Queue Update": {
+      "main": [
+        [
+          {
+            "node": "Update Case Document Status",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Optional OCR Handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Case Document Status": {
+      "main": [
+        [
+          {
+            "node": "Write Upload Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Upload Activity": {
+      "main": [
+        [
+          {
+            "node": "Notify Review Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "versionId": "14eecf79-ad74-4dae-a0c8-5165cca51c3d",
+  "id": "61e56167-dee4-489c-b1c6-8bf15afe4812",
+  "tags": []
+}

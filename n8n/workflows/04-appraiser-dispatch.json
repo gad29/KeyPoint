@@ -1,0 +1,228 @@
+{
+  "name": "KeyPoint / Appraiser dispatch",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/appraiser-dispatch",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "85c91e5d-6cc3-4314-9487-8f1f96ccc1b4",
+      "name": "Appraiser Dispatch Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_APPRAISERS_TABLE || \"Appraisers\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filterByFormula",
+              "value": "=IF({Region} = \"{{$json.body?.region || $json.region || \"\"}}\", TRUE(), FALSE())"
+            },
+            {
+              "name": "maxRecords",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "id": "cac3352d-cf18-429c-8152-355809a39273",
+      "name": "Load Appraisers by Region",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst input = $('Appraiser Dispatch Webhook').first().json.body ?? $('Appraiser Dispatch Webhook').first().json;\nconst appraisers = $json.records || [];\nif (!appraisers.length) throw new Error('No matching appraiser found');\nconst selected = appraisers[0];\nconst now = new Date().toISOString();\nreturn [{ json: {\n  ...input,\n  now,\n  selectedAppraiser: selected,\n  appraisalJobCreate: {\n    records: [{\n      fields: {\n        'Case link': [input.caseId],\n        'Appraiser link': [selected.id],\n        'Referral sent at': now,\n        'Exceptions / notes': input.notes || '',\n      }\n    }]\n  },\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [input.caseId],\n        'Actor': 'n8n',\n        'Event type': 'appraiser_dispatched',\n        'Summary': `Appraiser dispatch sent to ${selected.fields?.Name || 'selected appraiser'}`,\n        'Source system': 'n8n',\n        'Timestamp': now,\n      }\n    }]\n  },\n  appraiserMessage: {\n    appraiserName: selected.fields?.Name,\n    whatsapp: selected.fields?.['WhatsApp number'],\n    email: selected.fields?.Email,\n    caseId: input.caseId,\n    propertyAddress: input.propertyAddress,\n    requestedVisitWindow: input.requestedVisitWindow,\n    valuationContext: input.valuationContext || '',\n  }\n}}];\n"
+      },
+      "id": "372da770-e0f3-4330-9470-3aeb1f975064",
+      "name": "Select Appraiser + Build Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_APPRAISAL_JOBS_TABLE || \"Appraisal jobs\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.appraisalJobCreate }}"
+      },
+      "id": "dee59202-0959-4c97-b964-22cf5d4e842b",
+      "name": "Create Appraisal Job",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1170,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$env.KEYPOINT_APPRAISER_NOTIFY_WEBHOOK_URL}}",
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.appraiserMessage }}"
+      },
+      "id": "06b0a203-2c24-431d-aacb-48c6e354d925",
+      "name": "Send Appraiser Brief",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1170,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.activityLogCreate }}"
+      },
+      "id": "eb4ef99e-4663-4a21-9dfe-de5bc791f946",
+      "name": "Write Appraiser Activity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1460,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Appraiser Dispatch Webhook": {
+      "main": [
+        [
+          {
+            "node": "Load Appraisers by Region",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Appraisers by Region": {
+      "main": [
+        [
+          {
+            "node": "Select Appraiser + Build Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Appraiser + Build Job": {
+      "main": [
+        [
+          {
+            "node": "Create Appraisal Job",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Appraiser Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Appraisal Job": {
+      "main": [
+        [
+          {
+            "node": "Write Appraiser Activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "versionId": "de33e229-0073-453b-a537-d810d4bfd73f",
+  "id": "173fc366-0566-4275-8389-d5ea6a3faabc",
+  "tags": []
+}
