@@ -1,0 +1,125 @@
+# Airtable schema draft
+
+## 1. Cases
+Core mortgage case record.
+
+Fields:
+- Case ID
+- Lead name
+- Spouse name
+- Phone
+- Email
+- Case type
+- Borrower profiles (multi-select)
+- Current stage
+- Assigned staff
+- Missing items count
+- Appraiser status
+- Recommendation status
+- Client portal status
+- Fillout submission id
+- Notes
+
+## 2. Clients
+Normalized client profile and login/contact metadata.
+
+Fields:
+- Client ID
+- Case link
+- Full name
+- ID number
+- Preferred language
+- WhatsApp number
+- Portal invited at
+- Last portal activity
+
+## 3. Document library
+Master list of supported documents.
+
+Fields:
+- Document code
+- Group
+- English label
+- Hebrew label
+- Description
+- Default relevance logic
+- Borrower profile applicability
+- Case type applicability
+
+## 4. Case documents
+Per-case document checklist and review state.
+
+Fields:
+- Case link
+- Document library link
+- Required?
+- Status
+- Uploaded file URL
+- OCR summary
+- Review notes
+- Requested resubmission at
+- Approved at
+
+## 5. Bank runs
+Tracks requests and approvals-in-principle by bank.
+
+Fields:
+- Case link
+- Bank name
+- Requested at
+- Status
+- First payment
+- Max payment
+- Total repayment
+- Total interest
+- Expiry date
+- Conditions / comments
+
+## 6. Appraisers
+Appraiser vendor directory.
+
+Fields:
+- Appraiser ID
+- Name
+- Region
+- WhatsApp number
+- Email
+- Notes
+
+## 7. Appraisal jobs
+Case-specific appraisal workflow.
+
+Fields:
+- Case link
+- Appraiser link
+- Referral sent at
+- Visit scheduled for
+- Valuation received at
+- Valuation amount
+- Invoice amount
+- Payment status
+- Exceptions / notes
+
+## 8. Activity log
+Audit-friendly timeline.
+
+Fields:
+- Case link
+- Actor
+- Event type
+- Summary
+- Source system
+- Timestamp
+
+## 9. AI reviews
+Stores anonymized review requests and outputs.
+
+Fields:
+- Case link
+- Triggered by
+- Anonymized payload ref
+- Review status
+- Findings summary
+- Missing items found
+- Risk flags
+- Suggested next steps

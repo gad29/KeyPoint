@@ -1,0 +1,22 @@
+import { env } from '@/lib/env';
+
+export async function triggerN8n(pathname: string, payload: unknown) {
+  if (!env.n8nWebhookBaseUrl) {
+    return { ok: false, error: 'N8N webhook base URL is not configured' } as const;
+  }
+
+  const url = `${env.n8nWebhookBaseUrl.replace(/\/$/, '')}/${pathname.replace(/^\//, '')}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    return { ok: false, error: `n8n webhook failed with ${res.status}` } as const;
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  const data = contentType.includes('application/json') ? await res.json() : await res.text();
+  return { ok: true, data } as const;
+}
