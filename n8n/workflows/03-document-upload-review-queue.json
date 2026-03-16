@@ -1,197 +1,346 @@
 {
-  "name": "KeyPoint / Document upload review queue",
+  "name": "KeyPoint | Document upload review queue",
   "nodes": [
     {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "keypoint/document-upload-review",
-        "responseMode": "lastNode",
-        "options": {}
-      },
-      "id": "c848c5b2-344e-4038-be95-c3007d61a4f4",
-      "name": "Document Upload Review Webhook",
+      "id": "uploadWebhook",
+      "name": "Document upload webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        250,
-        300
-      ]
+        220,
+        320
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/document-upload",
+        "responseMode": "responseNode"
+      }
     },
     {
+      "id": "normalizeUpload",
+      "name": "Normalize upload event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        500,
+        320
+      ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "\nconst body = $json.body ?? $json;\nfor (const field of ['caseId', 'caseDocumentRecordId', 'documentCode', 'fileUrl']) {\n  if (!body[field]) throw new Error(`Missing required field: ${field}`);\n}\nconst now = new Date().toISOString();\nconst reviewSummary = body.ocrSummary || `Queued ${body.documentCode} for secretary review`;\nreturn [{ json: {\n  ...body,\n  now,\n  caseDocumentPatch: {\n    records: [{\n      id: body.caseDocumentRecordId,\n      fields: {\n        'Status': 'under-review',\n        'Uploaded file URL': body.fileUrl,\n        'OCR summary': reviewSummary,\n        'Review notes': body.reviewNotes || '',\n      }\n    }]\n  },\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [body.caseId],\n        'Actor': 'n8n',\n        'Event type': 'document_uploaded',\n        'Summary': `${body.documentCode} uploaded and queued for review`,\n        'Source system': 'portal',\n        'Timestamp': now,\n      }\n    }]\n  },\n  officeAlert: {\n    caseId: body.caseId,\n    documentCode: body.documentCode,\n    fileUrl: body.fileUrl,\n    reviewStatus: 'under-review',\n    message: `${body.documentCode} is waiting in the document review queue for case ${body.caseId}.`\n  }\n}}];\n"
-      },
-      "id": "9bb1c1e2-5738-495a-b6c6-98471cb6c59b",
-      "name": "Prepare Review Queue Update",
-      "type": "n8n-nodes-base.code",
+        "assignments": {
+          "assignments": [
+            {
+              "name": "caseDocumentRecordId",
+              "value": "={{ $json.body.caseDocumentRecordId || $json.caseDocumentRecordId }}",
+              "type": "string"
+            },
+            {
+              "name": "caseId",
+              "value": "={{ $json.body.caseId || $json.caseId }}",
+              "type": "string"
+            },
+            {
+              "name": "documentCode",
+              "value": "={{ $json.body.documentCode || $json.documentCode }}",
+              "type": "string"
+            },
+            {
+              "name": "fileUrl",
+              "value": "={{ $json.body.fileUrl || $json.fileUrl }}",
+              "type": "string"
+            },
+            {
+              "name": "fileName",
+              "value": "={{ $json.body.fileName || $json.fileName }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "markUnderReview",
+      "name": "Mark under review",
+      "type": "n8n-nodes-base.airtable",
       "typeVersion": 2,
       "position": [
-        520,
-        300
-      ]
+        780,
+        220
+      ],
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Case documents"
+        },
+        "id": "={{ $json.caseDocumentRecordId }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { Status: \"under-review\", \"Uploaded file URL\": $json.fileUrl } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
     },
     {
-      "parameters": {
-        "method": "PATCH",
-        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_CASE_DOCUMENTS_TABLE || \"Case documents\"}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "options": {},
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.caseDocumentPatch }}"
-      },
-      "id": "2a701b61-6c34-4204-a915-4e7c67ac756e",
-      "name": "Update Case Document Status",
+      "id": "ocrExtraction",
+      "name": "OCR / extraction",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        840,
+        1040,
         220
-      ]
-    },
-    {
+      ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "options": {},
+        "url": "={{ $env.DOCUMENT_OCR_WEBHOOK_URL }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ $json.activityLogCreate }}"
-      },
-      "id": "7efba367-0457-4acf-8f0d-8ef183cd90a8",
-      "name": "Write Upload Activity",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1120,
-        220
-      ]
+        "jsonBody": "={{ { fileUrl: $json.fileUrl, fileName: $json.fileName, documentCode: $json.documentCode, caseId: $json.caseId } }}"
+      }
     },
     {
+      "id": "reviewGate",
+      "name": "Rejected?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        220
+      ],
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.KEYPOINT_OFFICE_NOTIFY_WEBHOOK_URL}}",
-        "options": {},
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
+        "conditions": {
+          "string": [
             {
-              "name": "Content-Type",
-              "value": "application/json"
+              "value1": "={{ $json.status || $json.reviewStatus }}",
+              "operation": "equal",
+              "value2": "rejected"
             }
           ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.officeAlert }}"
-      },
-      "id": "d684db15-48f0-44e3-a0fc-2723d610683a",
-      "name": "Notify Review Queue",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1400,
-        220
-      ]
+        }
+      }
     },
     {
+      "id": "queueSecretary",
+      "name": "Queue secretary review",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        120
+      ],
       "parameters": {
-        "method": "POST",
-        "url": "={{$env.KEYPOINT_OCR_WEBHOOK_URL}}",
-        "options": {},
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
+        "operation": "update",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { caseId: $json.caseId, documentCode: $json.documentCode, fileUrl: $json.fileUrl, languageHint: $json.languageHint || \"he\" } }}"
+        "table": {
+          "mode": "name",
+          "value": "Case documents"
+        },
+        "id": "={{ $item(0).$node[\"Normalize upload event\"].json.caseDocumentRecordId }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { Status: \"uploaded\", \"OCR summary\": $json.summary || \"Extraction complete\", \"Review notes\": $json.flags?.join(\", \") || \"Needs human validation\" } }}"
+        }
       },
-      "id": "deb2111c-ac11-4420-9b6c-8cb335f44e96",
-      "name": "Optional OCR Handoff",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "notifyReviewer",
+      "name": "Notify review queue",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        840,
-        440
-      ]
+        1820,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { channel: \"office-review\", caseId: $item(0).$node[\"Normalize upload event\"].json.caseId, documentCode: $item(0).$node[\"Normalize upload event\"].json.documentCode, message: `מסמך חדש מוכן לבדיקה: ${$item(0).$node[\"Normalize upload event\"].json.documentCode}` } }}"
+      }
+    },
+    {
+      "id": "markResubmit",
+      "name": "Mark resubmit needed",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        340
+      ],
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Case documents"
+        },
+        "id": "={{ $item(0).$node[\"Normalize upload event\"].json.caseDocumentRecordId }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { Status: \"resubmit-needed\", \"OCR summary\": $json.summary || \"Rejected by OCR/review rules\", \"Review notes\": $json.reason || \"Unreadable / incomplete\", \"Requested resubmission at\": new Date().toISOString() } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "requestResubmission",
+      "name": "Request resubmission",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1820,
+        340
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_PROVIDER_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { caseId: $item(0).$node[\"Normalize upload event\"].json.caseId, template: \"document_resubmit_he\", body: `צריך להעלות מחדש את המסמך ${$item(0).$node[\"Normalize upload event\"].json.documentCode}: ${$json.reason || \"הקובץ לא קריא\"}` } }}"
+      }
+    },
+    {
+      "id": "doneResponse",
+      "name": "Webhook response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        220
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, status: \"queued\" } }}"
+      }
     }
   ],
   "connections": {
-    "Document Upload Review Webhook": {
+    "Document upload webhook": {
       "main": [
         [
           {
-            "node": "Prepare Review Queue Update",
+            "node": "Normalize upload event",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Prepare Review Queue Update": {
+    "Normalize upload event": {
       "main": [
         [
           {
-            "node": "Update Case Document Status",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Optional OCR Handoff",
+            "node": "Mark under review",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Update Case Document Status": {
+    "Mark under review": {
       "main": [
         [
           {
-            "node": "Write Upload Activity",
+            "node": "OCR / extraction",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Write Upload Activity": {
+    "OCR / extraction": {
       "main": [
         [
           {
-            "node": "Notify Review Queue",
+            "node": "Rejected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rejected?": {
+      "main": [
+        [
+          {
+            "node": "Mark resubmit needed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Queue secretary review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue secretary review": {
+      "main": [
+        [
+          {
+            "node": "Notify review queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark resubmit needed": {
+      "main": [
+        [
+          {
+            "node": "Request resubmission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify review queue": {
+      "main": [
+        [
+          {
+            "node": "Webhook response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request resubmission": {
+      "main": [
+        [
+          {
+            "node": "Webhook response",
             "type": "main",
             "index": 0
           }
@@ -199,16 +348,18 @@
       ]
     }
   },
-  "pinData": {},
+  "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
+  "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": false
   },
-  "active": false,
-  "versionId": "14eecf79-ad74-4dae-a0c8-5165cca51c3d",
-  "id": "61e56167-dee4-489c-b1c6-8bf15afe4812",
-  "tags": []
+  "tags": [
+    "keypoint",
+    "mortgage-mvp",
+    "israel"
+  ],
+  "versionId": "1"
 }

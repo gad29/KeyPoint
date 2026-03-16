@@ -1,0 +1,265 @@
+{
+  "name": "KeyPoint | Office approval -> portal invite generation",
+  "nodes": [
+    {
+      "id": "approvalTrigger",
+      "name": "Case approved trigger",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
+      "position": [
+        220,
+        280
+      ],
+      "parameters": {
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "Cases",
+        "options": {
+          "watchFor": "recordUpdated"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "filterApproved",
+      "name": "Approved + pending portal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        280
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.fields[\"Current stage\"] }}",
+              "operation": "equal",
+              "value2": "approved"
+            },
+            {
+              "value1": "={{ $json.fields[\"Client portal status\"] }}",
+              "operation": "equal",
+              "value2": "pending-office-approval"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "generateInvite",
+      "name": "Generate portal invite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.KEYPOINT_APP_BASE_URL + \"/api/invites\" }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { caseId: $json.fields[\"Case ID\"] || $json.fields[\"Case Id\"] || $json.id } }}"
+      }
+    },
+    {
+      "id": "setMessage",
+      "name": "Build onboarding message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1020,
+        220
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "portalUrl",
+              "value": "={{ $json.portalUrl }}",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $item(0).$node[\"Case approved trigger\"].json.fields.Phone }}",
+              "type": "string"
+            },
+            {
+              "name": "message",
+              "value": "={{ `שלום ${$item(0).$node[\"Case approved trigger\"].json.fields[\"Lead name\"]}, פתחנו עבורך גישה לפורטל KeyPoint. להשלמת מסמכים: ${$json.portalUrl}` }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sendPortalInvite",
+      "name": "Send WhatsApp invite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_PROVIDER_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { to: $json.phone, body: $json.message, template: \"portal_invite_he\" } }}"
+      }
+    },
+    {
+      "id": "updateCase",
+      "name": "Mark portal activated",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        220
+      ],
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Cases"
+        },
+        "id": "={{ $item(0).$node[\"Case approved trigger\"].json.id }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { \"Client portal status\": \"invited\", \"Current stage\": \"portal-activated\" } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "logInviteActivity",
+      "name": "Log invite activity",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        220
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Activity log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { \"Case link\": [$item(0).$node[\"Case approved trigger\"].json.id], Actor: \"office-automation\", \"Event type\": \"portal_invite_sent\", Summary: \"Portal invite created and delivered to client\", \"Source system\": \"n8n\", Timestamp: new Date().toISOString() } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Case approved trigger": {
+      "main": [
+        [
+          {
+            "node": "Approved + pending portal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved + pending portal?": {
+      "main": [
+        [
+          {
+            "node": "Generate portal invite",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Generate portal invite": {
+      "main": [
+        [
+          {
+            "node": "Build onboarding message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build onboarding message": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp invite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp invite": {
+      "main": [
+        [
+          {
+            "node": "Mark portal activated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark portal activated": {
+      "main": [
+        [
+          {
+            "node": "Log invite activity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    "keypoint",
+    "mortgage-mvp",
+    "israel"
+  ],
+  "versionId": "1"
+}

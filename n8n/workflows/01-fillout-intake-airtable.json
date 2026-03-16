@@ -1,0 +1,376 @@
+{
+  "name": "KeyPoint | Fillout intake -> Airtable case creation",
+  "nodes": [
+    {
+      "id": "filloutWebhook",
+      "name": "Fillout intake webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/fillout-intake",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "normalizeIntake",
+      "name": "Normalize intake payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const body = $json.body ?? $json;\nconst answers = body.answers ?? body.submission?.questions ?? body.questions ?? {};\nconst get = (...keys) => {\n  for (const key of keys) {\n    const direct = answers[key];\n    if (direct !== undefined && direct !== null && direct !== '') return direct;\n  }\n  return '';\n};\nconst borrowerProfiles = [];\nif (get('employment_type', 'borrower_profile')?.toString().includes('שכיר')) borrowerProfiles.push('salaried');\nif (get('employment_type', 'borrower_profile')?.toString().includes('עצמאי')) borrowerProfiles.push('self-employed');\nconst caseTypeMap = {\n  'רכישה דירה יחידה': 'purchase-single-dwelling',\n  'רכישת דירה חלופית': 'purchase-replacement-dwelling',\n  'דירה להשקעה': 'purchase-investment-dwelling',\n  'מחזור': 'refinance',\n  'לכל מטרה': 'all-purpose-against-home',\n  'מחיר למשתכן/דירה בהנחה': 'discounted-program',\n  'בניה עצמית': 'self-build',\n  'שיפוץ': 'renovation',\n};\nconst documentSeeds = [\n  'id-card',\n  'advisor-authorization',\n  'bank-statements-3m',\n  'loan-summary',\n  'tabu-extract'\n];\nif (borrowerProfiles.includes('salaried')) documentSeeds.push('payslips-3m');\nif (borrowerProfiles.includes('self-employed')) documentSeeds.push('accountant-confirmation');\nconst caseTypeRaw = get('case_type', 'transaction_type');\nconst caseType = caseTypeMap[caseTypeRaw] ?? 'purchase-single-dwelling';\nif (['purchase-single-dwelling', 'purchase-replacement-dwelling', 'purchase-investment-dwelling', 'discounted-program'].includes(caseType)) {\n  documentSeeds.push('sale-agreement');\n}\nif (caseType === 'renovation') documentSeeds.push('renovation-quote');\nconst now = new Date().toISOString();\nreturn [{\n  json: {\n    sourceSubmissionId: body.submissionId ?? body.submission_id ?? body.id ?? now,\n    caseFields: {\n      'Lead name': get('full_name', 'lead_name'),\n      'Spouse name': get('spouse_name'),\n      Phone: get('phone', 'mobile'),\n      Email: get('email'),\n      'Case type': caseType,\n      'Borrower profiles': borrowerProfiles,\n      'Current stage': 'intake-submitted',\n      'Assigned staff': 'Unassigned',\n      'Missing items count': [...new Set(documentSeeds)].length,\n      'Client portal status': 'pending-office-approval',\n      'Fillout submission id': body.submissionId ?? body.submission_id ?? body.id ?? '',\n      Notes: get('notes', 'free_text')\n    },\n    clientFields: {\n      'Full name': get('full_name', 'lead_name'),\n      'ID number': get('teudat_zehut', 'id_number'),\n      'Preferred language': get('language_preference') || 'he',\n      'WhatsApp number': get('phone', 'mobile')\n    },\n    documentSeeds: [...new Set(documentSeeds)],\n    activityFields: {\n      Actor: 'system',\n      'Event type': 'intake_received',\n      Summary: 'Fillout intake captured and case seeded',\n      'Source system': 'fillout',\n      Timestamp: now,\n    },\n    officeNotification: {\n      channel: 'whatsapp',\n      text: `ליד חדש נכנס ל-KeyPoint עבור ${get('full_name', 'lead_name')} — נא לבדוק ולאשר פתיחת תיק.`\n    }\n  }\n}];"
+      }
+    },
+    {
+      "id": "validateMandatory",
+      "name": "Mandatory fields present?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        780,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.caseFields[\"Lead name\"] }}",
+              "operation": "notEmpty"
+            },
+            {
+              "value1": "={{ $json.caseFields.Phone }}",
+              "operation": "notEmpty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "createCase",
+      "name": "Create case in Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        180
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Cases"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ $json.caseFields }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "createClient",
+      "name": "Create client in Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        180
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Clients"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { ...$json.clientFields, \"Case link\": [$item(0).$node[\"Create case in Airtable\"].json.id] } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "buildChecklistRows",
+      "name": "Build case document rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        360
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const caseId = $item(0).$node[\"Create case in Airtable\"].json.id;\nreturn ($json.documentSeeds || []).map((code) => ({\n  json: {\n    'Case link': [caseId],\n    'Document code': code,\n    'Required?': true,\n    Status: 'not-uploaded'\n  }\n}));"
+      }
+    },
+    {
+      "id": "createCaseDocs",
+      "name": "Create case documents",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        360
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Case documents"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "logActivity",
+      "name": "Log activity",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        180
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Activity log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { ...$json.activityFields, \"Case link\": [$item(0).$node[\"Create case in Airtable\"].json.id] } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "notifyOffice",
+      "name": "Notify office",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { caseId: $item(0).$node[\"Create case in Airtable\"].json.id, ...$json.officeNotification } }}"
+      }
+    },
+    {
+      "id": "rejectResponse",
+      "name": "Reject invalid intake",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        460
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\":false,\"error\":\"Missing lead name or phone\"}",
+        "options": {
+          "responseCode": 422
+        }
+      }
+    },
+    {
+      "id": "successResponse",
+      "name": "Return success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2020,
+        220
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, caseId: $item(0).$node[\"Create case in Airtable\"].json.id, seededDocuments: $json.documentSeeds } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Fillout intake webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize intake payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize intake payload": {
+      "main": [
+        [
+          {
+            "node": "Mandatory fields present?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mandatory fields present?": {
+      "main": [
+        [
+          {
+            "node": "Create case in Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject invalid intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create case in Airtable": {
+      "main": [
+        [
+          {
+            "node": "Create client in Airtable",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log activity",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build case document rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build case document rows": {
+      "main": [
+        [
+          {
+            "node": "Create case documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create client in Airtable": {
+      "main": [
+        [
+          {
+            "node": "Notify office",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create case documents": {
+      "main": [
+        [
+          {
+            "node": "Notify office",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log activity": {
+      "main": [
+        [
+          {
+            "node": "Notify office",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify office": {
+      "main": [
+        [
+          {
+            "node": "Return success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    "keypoint",
+    "mortgage-mvp",
+    "israel"
+  ],
+  "versionId": "1"
+}

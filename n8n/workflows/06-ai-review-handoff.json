@@ -1,184 +1,222 @@
 {
-  "name": "KeyPoint / AI review handoff",
+  "name": "KeyPoint | AI review handoff",
   "nodes": [
     {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "keypoint/ai-review-handoff",
-        "responseMode": "lastNode",
-        "options": {}
-      },
-      "id": "905a8da9-730d-433c-b803-7f5741c36f1b",
-      "name": "AI Review Handoff Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "id": "reviewTrigger",
+      "name": "AI review trigger",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
       "position": [
-        260,
-        300
-      ]
+        220,
+        260
+      ],
+      "parameters": {
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "Cases",
+        "options": {
+          "watchFor": "recordUpdated"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
     },
     {
+      "id": "eligibleStage",
+      "name": "Eligible for AI review?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        260
+      ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "\nconst body = $json.body ?? $json;\nif (!body.caseId) throw new Error('caseId is required');\nconst now = new Date().toISOString();\nconst sanitized = {\n  caseId: body.caseId,\n  caseType: body.caseType,\n  borrowerProfiles: body.borrowerProfiles || [],\n  stage: body.stage,\n  incomeMonthly: body.incomeMonthly,\n  obligationsMonthly: body.obligationsMonthly,\n  requestedMortgageAmount: body.requestedMortgageAmount,\n  ltv: body.ltv,\n  documentSummaries: body.documentSummaries || [],\n  bankStatus: body.bankStatus || [],\n  notes: body.notes || '',\n};\nreturn [{ json: {\n  now,\n  caseId: body.caseId,\n  reviewRequest: sanitized,\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [body.caseId],\n        'Actor': body.triggeredBy || 'n8n',\n        'Event type': 'ai_review_sent',\n        'Summary': `AI review requested for ${body.caseId}`,\n        'Source system': 'n8n',\n        'Timestamp': now,\n      }\n    }]\n  }\n}}];\n"
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.fields[\"Current stage\"] }}",
+              "operation": "regex",
+              "value2": "secretary-review|ready-for-bank"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "fetchDocuments",
+      "name": "Fetch approved docs",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        780,
+        200
+      ],
+      "parameters": {
+        "operation": "list",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Case documents"
+        },
+        "additionalOptions": {
+          "filterByFormula": "={{ \"AND(FIND(\"\" + $item(0).$node[\"AI review trigger\"].json.id + \"\", ARRAYJOIN({Case link})), {Status}=\"approved\")\" }}"
+        }
       },
-      "id": "2923b4ea-517e-41e8-9573-764cb8e22852",
-      "name": "Anonymize Case Package",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "anonymizePackage",
+      "name": "Build anonymized package",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        560,
-        300
-      ]
+        1060,
+        200
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const caseFields = $item(0).$node[\"AI review trigger\"].json.fields;\nconst docs = $json.records || [];\nreturn [{ json: {\n  caseId: $item(0).$node[\"AI review trigger\"].json.id,\n  triggerStage: caseFields['Current stage'],\n  anonymizedPayload: {\n    caseType: caseFields['Case type'],\n    borrowerProfiles: caseFields['Borrower profiles'],\n    missingItemsCount: caseFields['Missing items count'],\n    docs: docs.map((doc) => ({ code: doc.fields['Document code'], ocrSummary: doc.fields['OCR summary'] }))\n  }\n}}];"
+      }
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "={{$env.KEYPOINT_AI_REVIEW_WEBHOOK_URL}}",
-        "options": {},
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.reviewRequest }}"
-      },
-      "id": "c2b91d0a-cb9f-466a-9609-43204687c0ab",
-      "name": "Send to AI Review Service",
+      "id": "callReviewAgent",
+      "name": "Send to AI reviewer",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        860,
-        300
-      ]
+        1340,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AI_REVIEW_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { caseId: $json.caseId, payload: $json.anonymizedPayload } }}"
+      }
     },
     {
-      "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "\n        const result = $json;\n        const request = $('Anonymize Case Package').first().json;\n        return [{ json: {\n          aiReviewCreate: {\n            records: [{\n              fields: {\n                'Case link': [request.caseId],\n                'Triggered by': 'n8n',\n                'Review status': result.status || 'completed',\n                'Findings summary': result.summary || '',\n                'Missing items found': Array.isArray(result.missingItems) ? result.missingItems.join('\n') : '',\n                'Risk flags': Array.isArray(result.riskFlags) ? result.riskFlags.join(', ') : '',\n                'Suggested next steps': Array.isArray(result.nextSteps) ? result.nextSteps.join('\n') : '',\n              }\n            }]\n          }\n        }}];\n"
-      },
-      "id": "5146e2cd-c5eb-4efd-bd5e-a6bcd75e3d29",
-      "name": "Build AI Review Airtable Record",
-      "type": "n8n-nodes-base.code",
+      "id": "saveReview",
+      "name": "Save AI review",
+      "type": "n8n-nodes-base.airtable",
       "typeVersion": 2,
       "position": [
-        1160,
-        300
-      ]
+        1600,
+        200
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "AI reviews"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { \"Case link\": [$item(0).$node[\"AI review trigger\"].json.id], \"Triggered by\": \"workflow\", \"Anonymized payload ref\": JSON.stringify($item(0).$node[\"Build anonymized package\"].json.anonymizedPayload), \"Review status\": $json.status || \"completed\", \"Findings summary\": $json.summary || \"\", \"Missing items found\": ($json.missingItems || []).join(\", \"), \"Risk flags\": ($json.risks || []).join(\", \"), \"Suggested next steps\": ($json.nextSteps || []).join(\" | \") } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_AI_REVIEWS_TABLE || \"AI reviews\"}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "options": {},
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.aiReviewCreate }}"
-      },
-      "id": "4f959bb1-89b6-4863-9fc8-dceb258593d1",
-      "name": "Write AI Review Record",
+      "id": "createTasks",
+      "name": "Create office follow-up",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1450,
-        240
-      ]
-    },
-    {
+        1860,
+        200
+      ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "options": {},
+        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ $(\"Anonymize Case Package\").first().json.activityLogCreate }}"
-      },
-      "id": "53b30bc5-e800-465d-b4e5-2ea19626e0fc",
-      "name": "Write AI Activity",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1450,
-        420
-      ]
+        "jsonBody": "={{ { caseId: $item(0).$node[\"AI review trigger\"].json.id, message: `AI review completed. Risks: ${($json.risks || []).join(\", \") || \"none\"}` } }}"
+      }
     }
   ],
   "connections": {
-    "AI Review Handoff Webhook": {
+    "AI review trigger": {
       "main": [
         [
           {
-            "node": "Anonymize Case Package",
+            "node": "Eligible for AI review?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Anonymize Case Package": {
+    "Eligible for AI review?": {
       "main": [
         [
           {
-            "node": "Send to AI Review Service",
+            "node": "Fetch approved docs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Fetch approved docs": {
+      "main": [
+        [
+          {
+            "node": "Build anonymized package",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send to AI Review Service": {
+    "Build anonymized package": {
       "main": [
         [
           {
-            "node": "Build AI Review Airtable Record",
+            "node": "Send to AI reviewer",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Build AI Review Airtable Record": {
+    "Send to AI reviewer": {
       "main": [
         [
           {
-            "node": "Write AI Review Record",
+            "node": "Save AI review",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Save AI review": {
+      "main": [
+        [
           {
-            "node": "Write AI Activity",
+            "node": "Create office follow-up",
             "type": "main",
             "index": 0
           }
@@ -186,16 +224,18 @@
       ]
     }
   },
-  "pinData": {},
+  "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
+  "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": false
   },
-  "active": false,
-  "versionId": "7d1a84f8-5a1f-411b-945a-cff5ed3e51c8",
-  "id": "fe07d699-a6df-4e7a-843f-3873779cacd9",
-  "tags": []
+  "tags": [
+    "keypoint",
+    "mortgage-mvp",
+    "israel"
+  ],
+  "versionId": "1"
 }

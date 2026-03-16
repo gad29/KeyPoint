@@ -1,0 +1,271 @@
+{
+  "name": "KeyPoint | Bank follow-up and reminders",
+  "nodes": [
+    {
+      "id": "dailyCron",
+      "name": "Daily 08:00 cron",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        260
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "getBankRuns",
+      "name": "Fetch active bank runs",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        500,
+        260
+      ],
+      "parameters": {
+        "operation": "list",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Bank runs"
+        },
+        "additionalOptions": {
+          "filterByFormula": "OR({Status}=\"requested\",{Status}=\"received\")"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "splitRuns",
+      "name": "Split bank runs",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        760,
+        260
+      ],
+      "parameters": {
+        "fieldToSplitOut": "records"
+      }
+    },
+    {
+      "id": "prepareReminder",
+      "name": "Calculate reminder urgency",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        260
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const record = $json;\nconst expiry = new Date(record.fields?.['Expiry date'] || record.fields?.Expiry || Date.now());\nconst ms = expiry.getTime() - Date.now();\nconst days = Math.ceil(ms / (1000 * 60 * 60 * 24));\nconst bucket = days <= 0 ? 'expired' : days <= 2 ? 'urgent' : days <= 5 ? 'soon' : 'watch';\nreturn [{ json: { ...record, reminderBucket: bucket, daysToExpiry: days } }];"
+      }
+    },
+    {
+      "id": "needsReminder",
+      "name": "Urgent / expired?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        260
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.reminderBucket }}",
+              "operation": "regex",
+              "value2": "urgent|expired"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "notifyAdvisor",
+      "name": "Notify advisor",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { caseId: $json.fields[\"Case link\"]?.[0], bank: $json.fields[\"Bank name\"], message: `מעקב בנק ${$json.fields[\"Bank name\"]}: תוקף בעוד ${$json.daysToExpiry} ימים` } }}"
+      }
+    },
+    {
+      "id": "markExpired",
+      "name": "Mark expired records",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        340
+      ],
+      "parameters": {
+        "operation": "update",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Bank runs"
+        },
+        "id": "={{ $json.id }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ $json.reminderBucket === \"expired\" ? { Status: \"expired\" } : {} }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "logReminder",
+      "name": "Log reminder",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        200
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Activity log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { Actor: \"bank-reminder-bot\", \"Event type\": \"bank_followup\", Summary: `Reminder sent for ${$json.fields[\"Bank name\"]}`, \"Source system\": \"n8n\", Timestamp: new Date().toISOString(), \"Case link\": $json.fields[\"Case link\"] || [] } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily 08:00 cron": {
+      "main": [
+        [
+          {
+            "node": "Fetch active bank runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch active bank runs": {
+      "main": [
+        [
+          {
+            "node": "Split bank runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split bank runs": {
+      "main": [
+        [
+          {
+            "node": "Calculate reminder urgency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate reminder urgency": {
+      "main": [
+        [
+          {
+            "node": "Urgent / expired?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent / expired?": {
+      "main": [
+        [
+          {
+            "node": "Notify advisor",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Mark expired records",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Notify advisor": {
+      "main": [
+        [
+          {
+            "node": "Log reminder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    "keypoint",
+    "mortgage-mvp",
+    "israel"
+  ],
+  "versionId": "1"
+}

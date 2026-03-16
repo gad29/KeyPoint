@@ -1,123 +1,257 @@
 {
-  "name": "KeyPoint / Client status notifications",
+  "name": "KeyPoint | Client status notifications",
   "nodes": [
     {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "keypoint/client-status-notify",
-        "responseMode": "lastNode",
-        "options": {}
-      },
-      "id": "505e5f12-060f-437e-b03f-295b1de00f01",
-      "name": "Client Status Notification Webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "id": "statusTrigger",
+      "name": "Case status trigger",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
       "position": [
-        260,
-        300
-      ]
+        220,
+        280
+      ],
+      "parameters": {
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "Cases",
+        "options": {
+          "watchFor": "recordUpdated"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
     },
     {
+      "id": "stageChanged",
+      "name": "Allowed client-facing stage?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        500,
+        280
+      ],
       "parameters": {
-        "mode": "runOnceForAllItems",
-        "jsCode": "\nconst body = $json.body ?? $json;\nfor (const field of ['caseId', 'stage']) {\n  if (!body[field]) throw new Error(`Missing required field: ${field}`);\n}\nconst lang = body.preferredLanguage || 'he';\nconst templates = {\n  he: {\n    'portal-activated': '\u05d4\u05e7\u05d9\u05e9\u05d5\u05e8 \u05dc\u05e4\u05d5\u05e8\u05d8\u05dc \u05e9\u05dc\u05da \u05de\u05d5\u05db\u05df. \u05d0\u05e4\u05e9\u05e8 \u05dc\u05d4\u05ea\u05d7\u05d9\u05dc \u05dc\u05d4\u05e2\u05dc\u05d5\u05ea \u05de\u05e1\u05de\u05db\u05d9\u05dd \u05e2\u05db\u05e9\u05d9\u05d5.',\n    'documents-in-progress': '\u05e7\u05d9\u05d1\u05dc\u05e0\u05d5 \u05d0\u05ea \u05d4\u05d4\u05ea\u05e7\u05d3\u05de\u05d5\u05ea \u05e9\u05dc\u05da. \u05e2\u05d3\u05d9\u05d9\u05df \u05d7\u05e1\u05e8\u05d9\u05dd \u05de\u05e1\u05de\u05db\u05d9\u05dd \u05dc\u05d4\u05de\u05e9\u05da \u05d8\u05d9\u05e4\u05d5\u05dc.',\n    'waiting-appraiser': '\u05d4\u05ea\u05d9\u05e7 \u05de\u05d5\u05db\u05df \u05dc\u05e9\u05de\u05d0\u05d5\u05ea. \u05e0\u05e2\u05d3\u05db\u05df \u05d0\u05d5\u05ea\u05da \u05d1\u05e8\u05d2\u05e2 \u05e9\u05ea\u05d5\u05d0\u05dd \u05de\u05d5\u05e2\u05d3.',\n    'ready-for-bank': '\u05d4\u05de\u05e1\u05de\u05db\u05d9\u05dd \u05d4\u05d5\u05e9\u05dc\u05de\u05d5 \u05d5\u05d0\u05e0\u05d7\u05e0\u05d5 \u05de\u05ea\u05d7\u05d9\u05dc\u05d9\u05dd \u05e2\u05d1\u05d5\u05d3\u05d4 \u05de\u05d5\u05dc \u05d4\u05d1\u05e0\u05e7\u05d9\u05dd.',\n    'bank-negotiation': '\u05d0\u05e0\u05d7\u05e0\u05d5 \u05de\u05e0\u05d4\u05dc\u05d9\u05dd \u05de\u05d5\u05f4\u05de \u05de\u05d5\u05dc \u05d4\u05d1\u05e0\u05e7\u05d9\u05dd \u05d5\u05e0\u05e2\u05d3\u05db\u05df \u05e2\u05dd \u05d4\u05e6\u05e2\u05d5\u05ea \u05e8\u05dc\u05d5\u05d5\u05e0\u05d8\u05d9\u05d5\u05ea.',\n  },\n  en: {\n    'portal-activated': 'Your portal link is ready. You can start uploading documents now.',\n    'documents-in-progress': 'We received your progress. Some documents are still needed.',\n    'waiting-appraiser': 'Your case is ready for appraisal. We will update you once the visit is booked.',\n    'ready-for-bank': 'Your documents are complete and we are starting bank outreach.',\n    'bank-negotiation': 'We are negotiating with banks and will update you with relevant offers.',\n  }\n};\nconst message = templates[lang]?.[body.stage] || templates.en[body.stage] || `Status updated: ${body.stage}`;\nconst now = new Date().toISOString();\nreturn [{ json: {\n  ...body,\n  now,\n  outbound: {\n    caseId: body.caseId,\n    phone: body.phone,\n    email: body.email,\n    preferredLanguage: lang,\n    stage: body.stage,\n    message,\n    portalUrl: body.portalUrl || null,\n  },\n  activityLogCreate: {\n    records: [{\n      fields: {\n        'Case link': [body.caseId],\n        'Actor': 'n8n',\n        'Event type': 'client_status_notification',\n        'Summary': `Client notified about ${body.stage}`,\n        'Source system': 'n8n',\n        'Timestamp': now,\n      }\n    }]\n  }\n}}];\n"
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.fields[\"Current stage\"] }}",
+              "operation": "regex",
+              "value2": "portal-activated|documents-in-progress|waiting-appraiser|appraisal-received|ready-for-bank|recommendation-prepared|completed"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "loadClient",
+      "name": "Load client contact",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        780,
+        220
+      ],
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Clients"
+        },
+        "filterByFormula": "={{ \"FIND(\"\" + $item(0).$node[\"Case status trigger\"].json.id + \"\", ARRAYJOIN({Case link}))\" }}"
       },
-      "id": "254162d9-0288-4919-95df-1d40c5801650",
-      "name": "Render Client Message",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "composeTemplate",
+      "name": "Compose message",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        560,
-        300
-      ]
+        1060,
+        220
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const stage = $item(0).$node[\"Case status trigger\"].json.fields['Current stage'];\nconst messages = {\n  'portal-activated': 'הפורטל נפתח ואפשר להתחיל להעלות מסמכים.',\n  'documents-in-progress': 'קיבלנו חלק מהמסמכים וממשיכים בבדיקה.',\n  'waiting-appraiser': 'התיק הועבר לתיאום שמאות.',\n  'appraisal-received': 'השמאות התקבלה ונמשיך לשלב הבא.',\n  'ready-for-bank': 'התיק מוכן לפנייה לבנקים.',\n  'recommendation-prepared': 'המלצת המשכנתא מוכנה לתיאום שיחה.',\n  'completed': 'התיק הושלם. תודה שבחרת ב-KeyPoint.'\n};\nreturn [{ json: {\n  stage,\n  message: messages[stage] || 'יש עדכון בתיק שלך ב-KeyPoint.',\n  phone: $json.fields?.['WhatsApp number'] || '',\n  email: $json.fields?.Email || ''\n}}];"
+      }
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "={{$env.KEYPOINT_CLIENT_NOTIFY_WEBHOOK_URL}}",
-        "options": {},
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ $json.outbound }}"
-      },
-      "id": "1f6b0a09-6091-4752-985b-26d3013bc09e",
-      "name": "Send Client Message",
+      "id": "sendWhatsapp",
+      "name": "Send WhatsApp",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        860,
-        300
-      ]
-    },
-    {
+        1340,
+        160
+      ],
       "parameters": {
         "method": "POST",
-        "url": "=https://api.airtable.com/v0/{{$env.AIRTABLE_BASE_ID}}/{{$env.KEYPOINT_AIRTABLE_ACTIVITY_LOG_TABLE || \"Activity log\"}}",
-        "sendHeaders": true,
-        "headerParameters": {
-          "parameters": [
-            {
-              "name": "Authorization",
-              "value": "=Bearer {{$env.AIRTABLE_API_KEY}}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "options": {},
+        "url": "={{ $env.WHATSAPP_PROVIDER_WEBHOOK_URL }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ $json.activityLogCreate }}"
-      },
-      "id": "ca88e582-648f-4aae-9a6c-7a726c0f6ffa",
-      "name": "Log Notification Activity",
+        "jsonBody": "={{ { to: $json.phone, body: $json.message, stage: $json.stage } }}"
+      }
+    },
+    {
+      "id": "whatsAppFailed",
+      "name": "WhatsApp missing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        320
+      ],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.phone }}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sendEmailFallback",
+      "name": "Send email fallback",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1160,
-        300
-      ]
+        1600,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EMAIL_PROVIDER_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { to: $json.email, subject: \"KeyPoint status update\", text: $json.message } }}"
+      }
+    },
+    {
+      "id": "logNotification",
+      "name": "Log notification",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        220
+      ],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Activity log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { \"Case link\": [$item(0).$node[\"Case status trigger\"].json.id], Actor: \"client-notifier\", \"Event type\": \"client_status_update\", Summary: `Client notified about ${$json.stage}`, \"Source system\": \"n8n\", Timestamp: new Date().toISOString() } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
     }
   ],
   "connections": {
-    "Client Status Notification Webhook": {
+    "Case status trigger": {
       "main": [
         [
           {
-            "node": "Render Client Message",
+            "node": "Allowed client-facing stage?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Render Client Message": {
+    "Allowed client-facing stage?": {
       "main": [
         [
           {
-            "node": "Send Client Message",
+            "node": "Load client contact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Load client contact": {
+      "main": [
+        [
+          {
+            "node": "Compose message",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Send Client Message": {
+    "Compose message": {
       "main": [
         [
           {
-            "node": "Log Notification Activity",
+            "node": "Send WhatsApp",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp missing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp missing?": {
+      "main": [
+        [
+          {
+            "node": "Send email fallback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Send WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Log notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send email fallback": {
+      "main": [
+        [
+          {
+            "node": "Log notification",
             "type": "main",
             "index": 0
           }
@@ -125,16 +259,18 @@
       ]
     }
   },
-  "pinData": {},
+  "active": false,
   "settings": {
     "executionOrder": "v1"
   },
-  "staticData": null,
+  "pinData": {},
   "meta": {
     "templateCredsSetupCompleted": false
   },
-  "active": false,
-  "versionId": "e8cda977-b379-4f20-a83d-54eae99fa71a",
-  "id": "5afa48e2-4684-4335-9e69-fe8e6658775b",
-  "tags": []
+  "tags": [
+    "keypoint",
+    "mortgage-mvp",
+    "israel"
+  ],
+  "versionId": "1"
 }
