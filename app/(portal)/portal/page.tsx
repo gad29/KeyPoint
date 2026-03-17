@@ -1,6 +1,6 @@
-import { documentLibrary, sampleCases } from '@/data/domain';
+import { documentLibrary } from '@/data/domain';
+import { listCases } from '@/lib/repository';
 
-const caseRecord = sampleCases[0];
 const portalStages = [
   'Intake submitted',
   'Portal activated',
@@ -10,7 +10,20 @@ const portalStages = [
   'Ready for bank work',
 ];
 
-export default function PortalPage() {
+export default async function PortalPage() {
+  const cases = await listCases();
+  const caseRecord = cases[0];
+
+  if (!caseRecord) {
+    return (
+      <section className="card">
+        <p className="eyebrow">Client portal</p>
+        <h2>No case available</h2>
+        <p className="muted">Add a sample case or connect Airtable to render the portal view.</p>
+      </section>
+    );
+  }
+
   return (
     <div className="grid cols-2">
       <section className="card">

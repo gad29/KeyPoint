@@ -2,11 +2,18 @@
 
 Use this checklist to move KeyPoint from preview/demo mode into a fully wired MVP.
 
+## 0) Settings-driven bootstrap
+- [ ] Copy `keypoint.settings.example.json` to `keypoint.settings.json`
+- [ ] Fill in base URLs, Airtable values, messaging values, email values, and any Google/Twilio details you want to use
+- [ ] Run `npm run apply-settings`
+- [ ] Review `generated/connections-summary.md`
+- [ ] Push `generated/vercel.env` values into Vercel
+- [ ] Push `n8n/.env.generated` values into n8n
+
 ## 1) Domain + deployment
 - [ ] Confirm `keypoint.work` DNS is under your control
 - [ ] Add `keypoint.work` and `www.keypoint.work` to the Vercel project
 - [ ] Point DNS records to Vercel
-- [ ] Set production env vars in Vercel
 - [ ] Promote a production deployment only after Airtable + n8n are wired
 
 ## 2) Airtable
@@ -23,7 +30,7 @@ Use this checklist to move KeyPoint from preview/demo mode into a fully wired MV
   - [ ] AI reviews
 - [ ] Match field names to `docs/airtable-schema.md`
 - [ ] Create an API token with access to the KeyPoint base
-- [ ] Record the Base ID and token for env setup
+- [ ] Record the Base ID and token in `keypoint.settings.json`
 
 ## 3) Fillout
 - [ ] Create the public intake form in Fillout
@@ -35,15 +42,16 @@ Use this checklist to move KeyPoint from preview/demo mode into a fully wired MV
 ## 4) n8n
 - [ ] Import workflow drafts from `n8n/workflows/`
 - [ ] Create Airtable credentials in n8n
-- [ ] Set n8n environment variables from `n8n/.env.example`
-- [ ] Replace placeholder webhook URLs with real endpoints/providers
+- [ ] Load values from `n8n/.env.generated`
+- [ ] Replace any remaining placeholder webhook URLs with real endpoints/providers
 - [ ] Test each workflow independently before activation
 - [ ] Turn on retry/error notifications in n8n
 
 ## 5) Messaging
 - [ ] Decide the approved outbound WhatsApp provider path
-- [ ] Wire WhatsApp webhook endpoint into n8n env
-- [ ] Wire fallback email endpoint/provider
+- [ ] Decide the SMS provider path if SMS is needed
+- [ ] Decide the email provider path
+- [ ] Confirm sender numbers / sender email addresses in `keypoint.settings.json`
 - [ ] Test office alert notifications
 - [ ] Test client-facing status updates
 
@@ -53,12 +61,10 @@ Use this checklist to move KeyPoint from preview/demo mode into a fully wired MV
 - [ ] Confirm anonymization rules for AI review payloads
 - [ ] Test document upload -> OCR -> review loop
 
-## 7) KeyPoint app
-- [ ] Set production `APP_BASE_URL`
-- [ ] Set `PORTAL_INVITE_SECRET`
-- [ ] Decide whether upload storage stays local for MVP or moves to cloud storage
-- [ ] Confirm `/api/invites` is reachable from n8n in production
-- [ ] Smoke-test `/office`, `/portal`, `/login`, and invite links
+## 7) Storage
+- [ ] Decide whether local upload storage is acceptable for MVP
+- [ ] If not, add a durable upload/storage path and set `UPLOAD_PUBLIC_BASE_URL` or downstream automation accordingly
+- [ ] Confirm uploaded document references are available to n8n and reviewers
 
 ## 8) Go-live gate
 Only call it ready for live use when all of these are true:

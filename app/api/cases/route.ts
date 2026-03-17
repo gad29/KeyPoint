@@ -1,15 +1,13 @@
 import { NextResponse } from 'next/server';
 import { listCases } from '@/lib/repository';
-import { listAirtableCases } from '@/lib/airtable';
+import { hasAirtableConfig } from '@/lib/env';
 
 export async function GET() {
-  const localCases = await listCases();
-  const airtable = await listAirtableCases();
+  const cases = await listCases();
 
   return NextResponse.json({
     ok: true,
-    source: airtable.ok ? 'airtable+local' : 'local',
-    airtable,
-    data: localCases,
+    source: hasAirtableConfig() ? 'airtable-or-fallback' : 'local-sample',
+    data: cases,
   });
 }

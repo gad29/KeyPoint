@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUploadDirectory, saveUpload } from '@/lib/repository';
+import { env } from '@/lib/env';
 
 export async function POST(req: NextRequest) {
   const formData = await req.formData();
@@ -21,11 +22,15 @@ export async function POST(req: NextRequest) {
   const outputPath = path.join(uploadDir, safeName);
   fs.writeFileSync(outputPath, bytes);
 
+  const publicPath = env.uploadPublicBaseUrl
+    ? `${env.uploadPublicBaseUrl.replace(/\/$/, '')}/${safeName}`
+    : outputPath;
+
   const record = await saveUpload({
     caseId,
     documentCode,
     fileName: file.name,
-    path: outputPath,
+    path: publicPath,
   });
 
   return NextResponse.json({ ok: true, data: record });

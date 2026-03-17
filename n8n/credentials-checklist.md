@@ -2,7 +2,12 @@
 
 Before enabling workflows in n8n, prepare these values.
 
-## Required
+## Best path
+- Fill in `keypoint.settings.json`
+- Run `npm run apply-settings`
+- Load values from `n8n/.env.generated`
+
+## Required core values
 - Airtable API token
 - Airtable Base ID
 - KeyPoint app base URL
@@ -12,19 +17,19 @@ Before enabling workflows in n8n, prepare these values.
 - OCR/extraction endpoint
 - AI review endpoint
 
+## Optional provider values now supported by the settings generator
+- SMS provider webhook/API endpoint
+- Twilio Account SID / Auth Token
+- Twilio WhatsApp sender number
+- Twilio SMS sender number
+- Email sender address / reply-to / API key
+- Google client email / private key / Drive folder / Sheets spreadsheet
+
 ## n8n credential names used by the workflow drafts
 - `Airtable KeyPoint`
-
-## Environment variable references used in the workflow drafts
-- `AIRTABLE_BASE_ID`
-- `KEYPOINT_APP_BASE_URL`
-- `OFFICE_ALERT_WEBHOOK_URL`
-- `WHATSAPP_PROVIDER_WEBHOOK_URL`
-- `EMAIL_PROVIDER_WEBHOOK_URL`
-- `DOCUMENT_OCR_WEBHOOK_URL`
-- `AI_REVIEW_WEBHOOK_URL`
 
 ## Before activation
 - Test every outbound provider endpoint with sample payloads
 - Confirm callback/auth requirements for each provider
 - Add retry and failure notifications in n8n
+- If using Google or another OAuth-style provider, complete that provider's own consent/credential setup separately

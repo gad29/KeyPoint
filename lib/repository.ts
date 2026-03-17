@@ -2,12 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { sampleCases, documentLibrary, type CaseRecord } from '@/data/domain';
-import { env } from '@/lib/env';
+import { env, hasAirtableConfig } from '@/lib/env';
+import { getAirtableCaseByCaseId, listAirtableCases } from '@/lib/airtable';
+import { triggerN8n } from '@/lib/n8n';
 import type { PortalInvite, UploadRecord } from '@/lib/types';
 
 const appRoot = process.cwd();
 const dataRoot = path.join(appRoot, 'data');
-const invitesFile = path.join(dataRoot, 'invites.json');
 const uploadsFile = path.join(dataRoot, 'uploads.json');
 
 function ensureJsonFile(filePath: string, defaultValue: unknown) {
@@ -27,11 +28,67 @@ function writeJson(filePath: string, value: unknown) {
   fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
 }
 
+function base64url(input: string) {
+  return Buffer.from(input, 'utf8').toString('base64url');
+}
+
+function decodeBase64url(input: string) {
+  return Buffer.from(input, 'base64url').toString('utf8');
+}
+
+function signInvitePayload(encodedPayload: string) {
+  return crypto.createHmac('sha256', env.portalInviteSecret).update(encodedPayload).digest('base64url');
+}
+
+function makeInviteToken(caseRecord: CaseRecord) {
+  const payload = {
+    caseId: caseRecord.id,
+    leadName: caseRecord.leadName,
+    phone: caseRecord.phone,
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+  } satisfies Omit<PortalInvite, 'token'>;
+
+  const encodedPayload = base64url(JSON.stringify(payload));
+  const signature = signInvitePayload(encodedPayload);
+  return `${encodedPayload}.${signature}`;
+}
+
+function parseInviteToken(token: string): Omit<PortalInvite, 'token'> | null {
+  const [encodedPayload, signature] = token.split('.');
+  if (!encodedPayload || !signature) return null;
+
+  const expectedSignature = signInvitePayload(encodedPayload);
+  const actual = Buffer.from(signature);
+  const expected = Buffer.from(expectedSignature);
+  if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
+
+  try {
+    const payload = JSON.parse(decodeBase64url(encodedPayload)) as Omit<PortalInvite, 'token'>;
+    if (!payload.caseId || !payload.leadName || !payload.phone || !payload.expiresAt) return null;
+    if (new Date(payload.expiresAt).getTime() < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 export async function listCases(): Promise<CaseRecord[]> {
+  if (!hasAirtableConfig()) return sampleCases;
+
+  const airtable = await listAirtableCases();
+  if (airtable.ok && airtable.data?.length) {
+    return airtable.data;
+  }
+
   return sampleCases;
 }
 
 export async function getCase(caseId: string): Promise<CaseRecord | undefined> {
+  if (hasAirtableConfig()) {
+    const airtable = await getAirtableCaseByCaseId(caseId);
+    if (airtable.ok && airtable.data) return airtable.data;
+  }
+
   return sampleCases.find((item) => item.id === caseId);
 }
 
@@ -51,24 +108,27 @@ export async function createInvite(caseId: string): Promise<PortalInvite> {
   const caseRecord = await getCase(caseId);
   if (!caseRecord) throw new Error('Case not found');
 
-  const invites = readJson<PortalInvite[]>(invitesFile, []);
-  const token = crypto.randomBytes(18).toString('hex');
-  const invite: PortalInvite = {
-    token,
-    caseId,
-    leadName: caseRecord.leadName,
-    phone: caseRecord.phone,
-    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-  };
+  const token = makeInviteToken(caseRecord);
+  const parsed = parseInviteToken(token);
+  if (!parsed) throw new Error('Failed to create invite token');
 
-  invites.unshift(invite);
-  writeJson(invitesFile, invites);
-  return invite;
+  return { token, ...parsed };
 }
 
 export async function getInvite(token: string): Promise<PortalInvite | undefined> {
-  const invites = readJson<PortalInvite[]>(invitesFile, []);
-  return invites.find((item) => item.token === token);
+  const parsed = parseInviteToken(token);
+  if (!parsed) return undefined;
+
+  const caseRecord = await getCase(parsed.caseId);
+  if (!caseRecord) return undefined;
+
+  return {
+    token,
+    caseId: caseRecord.id,
+    leadName: caseRecord.leadName,
+    phone: caseRecord.phone,
+    expiresAt: parsed.expiresAt,
+  };
 }
 
 export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>) {
@@ -78,8 +138,20 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
     uploadedAt: new Date().toISOString(),
     ...input,
   };
+
   uploads.unshift(record);
   writeJson(uploadsFile, uploads);
+
+  if (env.n8nWebhookBaseUrl) {
+    await triggerN8n('keypoint/document-upload', {
+      caseId: record.caseId,
+      documentCode: record.documentCode,
+      fileName: record.fileName,
+      uploadedAt: record.uploadedAt,
+      path: record.path,
+    });
+  }
+
   return record;
 }
 

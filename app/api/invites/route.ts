@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       data: invite,
-      portalUrl: `${env.appBaseUrl}/invite/${invite.token}`,
+      portalUrl: `${env.keypointAppBaseUrl}/invite/${invite.token}`,
     });
   } catch (error) {
     return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });

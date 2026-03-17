@@ -1,0 +1,64 @@
+{
+  "app": {
+    "baseUrl": "https://keypoint.work",
+    "portalInviteSecret": "replace-with-a-long-random-secret"
+  },
+  "airtable": {
+    "apiKey": "",
+    "baseId": "",
+    "tables": {
+      "cases": "Cases",
+      "clients": "Clients",
+      "documents": "Case documents",
+      "activityLog": "Activity log"
+    }
+  },
+  "storage": {
+    "mode": "local",
+    "uploadDir": "./data/uploads",
+    "uploadPublicBaseUrl": ""
+  },
+  "n8n": {
+    "webhookBaseUrl": "https://n8n.example.com/webhook"
+  },
+  "connections": {
+    "officeAlerts": {
+      "webhookUrl": ""
+    },
+    "whatsapp": {
+      "provider": "webhook",
+      "fromNumber": "",
+      "webhookUrl": ""
+    },
+    "sms": {
+      "provider": "webhook",
+      "fromNumber": "",
+      "webhookUrl": ""
+    },
+    "email": {
+      "provider": "webhook",
+      "fromAddress": "",
+      "replyTo": "",
+      "apiKey": "",
+      "webhookUrl": ""
+    },
+    "ocr": {
+      "webhookUrl": ""
+    },
+    "aiReview": {
+      "webhookUrl": ""
+    },
+    "twilio": {
+      "accountSid": "",
+      "authToken": "",
+      "whatsappFrom": "",
+      "smsFrom": ""
+    },
+    "google": {
+      "clientEmail": "",
+      "privateKey": "",
+      "driveFolderId": "",
+      "sheetsSpreadsheetId": ""
+    }
+  }
+}

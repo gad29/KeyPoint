@@ -1,22 +1,55 @@
 # KeyPoint deployment notes
 
 ## Current state
-- Preview deploy works on Vercel
-- Public access may still depend on Vercel preview protection settings
-- Production domain target: `keypoint.work`
+- Local build works
+- Cases can load from Airtable through the repository layer
+- Portal invite links are signed/stateless
+- Uploads still default to local disk unless you connect a storage path
+- Single settings file can generate app + n8n env files
 
-## Vercel production setup
-### Suggested production env vars
-- `APP_BASE_URL=https://keypoint.work`
-- `KEYPOINT_APP_BASE_URL=https://keypoint.work`
-- `PORTAL_INVITE_SECRET=<strong-random-secret>`
-- `AIRTABLE_API_KEY=<airtable-token>`
-- `AIRTABLE_BASE_ID=<base-id>`
-- `AIRTABLE_CASES_TABLE=Cases`
-- `AIRTABLE_CLIENTS_TABLE=Clients`
-- `AIRTABLE_DOCUMENTS_TABLE=Case documents`
-- `N8N_WEBHOOK_BASE_URL=<your-n8n-base-url>`
-- `UPLOAD_DIR=./data/uploads` (temporary MVP local mode only)
+## Fastest deployment flow
+1. Copy `keypoint.settings.example.json` to `keypoint.settings.json`
+2. Fill in all real credentials, phone numbers, provider endpoints, and base URLs
+3. Run:
+   ```bash
+   npm run apply-settings
+   ```
+4. Use:
+   - `generated/vercel.env` for Vercel env vars
+   - `n8n/.env.generated` for n8n env vars
+5. Import the workflow JSON files in `n8n/workflows/`
+
+## Suggested production env vars
+These are now generated automatically from the settings file:
+- `APP_BASE_URL`
+- `KEYPOINT_APP_BASE_URL`
+- `PORTAL_INVITE_SECRET`
+- `AIRTABLE_API_KEY`
+- `AIRTABLE_BASE_ID`
+- `AIRTABLE_CASES_TABLE`
+- `AIRTABLE_CLIENTS_TABLE`
+- `AIRTABLE_DOCUMENTS_TABLE`
+- `AIRTABLE_ACTIVITY_LOG_TABLE`
+- `N8N_WEBHOOK_BASE_URL`
+- `UPLOAD_DIR`
+- `UPLOAD_PUBLIC_BASE_URL`
+- `OFFICE_ALERT_WEBHOOK_URL`
+- `WHATSAPP_PROVIDER_WEBHOOK_URL`
+- `SMS_PROVIDER_WEBHOOK_URL`
+- `EMAIL_PROVIDER_WEBHOOK_URL`
+- `DOCUMENT_OCR_WEBHOOK_URL`
+- `AI_REVIEW_WEBHOOK_URL`
+- `TWILIO_ACCOUNT_SID`
+- `TWILIO_AUTH_TOKEN`
+- `TWILIO_WHATSAPP_FROM`
+- `TWILIO_SMS_FROM`
+- `EMAIL_FROM_ADDRESS`
+- `EMAIL_REPLY_TO`
+- `EMAIL_API_KEY`
+- `GOOGLE_CLIENT_EMAIL`
+- `GOOGLE_PRIVATE_KEY`
+- `GOOGLE_DRIVE_FOLDER_ID`
+- `GOOGLE_SHEETS_SPREADSHEET_ID`
 
 ## Domain wiring
 In Vercel:
@@ -25,21 +58,17 @@ In Vercel:
 3. Apply the DNS records Vercel gives you
 4. Set the production deployment as the one attached to the domain
 
-## Recommended next production improvement
-For MVP speed, you can deploy with local upload storage temporarily, but that is not ideal long-term. Better production options:
-- Vercel Blob
-- S3-compatible object storage
-- Supabase Storage
-
 ## Health checks after deploy
 - Home page loads
 - `/office` loads
+- `/portal` loads
 - `/login` loads
 - `/api/cases` returns JSON
-- invite generation works from office UI
-- preview/production base URL used in generated invite links is correct
+- invite generation works from the office UI
+- invite links open correctly
+- upload events hit n8n successfully
 
-## Known remaining non-demo gaps
-- real auth still needs improvement beyond invite-token access
-- uploads are not yet cloud-backed by default
-- Airtable and n8n need live credentials wired in
+## Remaining caveats
+- Vercel local disk is not durable storage; use a proper storage path if uploads matter in production
+- Some third-party services still require manual credential entry or OAuth consent on their own platform
+- Real auth beyond invite-token access is still a future hardening item

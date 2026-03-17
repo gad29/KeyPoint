@@ -1,47 +1,59 @@
 # KeyPoint
 
-Initial scaffold for the KeyPoint Israel-focused mortgage advisor MVP.
+KeyPoint is an Israel-focused mortgage advisor MVP built with Next.js, Airtable, n8n, and Fillout.
 
-## What exists now
-- Next.js app structure for a client portal and office dashboard
-- Seeded domain model for case stages, borrower profiles, documents, and bank offers
-- Draft Airtable schema under `docs/airtable-schema.md`
-- Draft n8n workflow map under `docs/n8n-workflows.md`
-- Importable n8n workflow drafts under `n8n/workflows/` with setup notes in `n8n/README.md`
-- Local repository layer for cases, invites, and uploads
-- API endpoints for cases, invite generation, uploads, and n8n webhook forwarding
-- Invite-based portal access flow and working upload page
-- Product screens under:
-  - `/`
-  - `/portal`
-  - `/office`
-  - `/docs`
-  - `/login`
-  - `/invite/[token]`
+## What is ready now
+- Next.js app scaffold for overview, office dashboard, portal, docs, login, and signed invite links
+- Airtable-backed case loading through the repository layer
+- n8n webhook bridge for workflow forwarding and upload events
+- Draft workflow pack under `n8n/workflows/`
+- Single settings-file generator for app env + n8n env output
+- Integration docs for Airtable, Fillout, deployment, and workflow rollout
 
-## Intended stack
-- Next.js for client/admin UI
-- Airtable as MVP operations datastore
-- n8n as automation backbone
-- Fillout as intake entry point
-- External payment tokenization provider
+## Single settings file flow
+1. Copy the example:
+   ```bash
+   cp keypoint.settings.example.json keypoint.settings.json
+   ```
+2. Fill in your real credentials, phone numbers, email address, webhook URLs, and provider values.
+3. Generate env files:
+   ```bash
+   npm run apply-settings
+   ```
+4. Generated outputs:
+   - `.env.local`
+   - `.env.production.local`
+   - `n8n/.env.generated`
+   - `generated/vercel.env`
+   - `generated/connections-summary.md`
 
-## Run
+## Run locally
 ```bash
 npm install
+npm run apply-settings   # after keypoint.settings.json exists
 npm run dev
 ```
 
-## Integration pack
-- `docs/integration-checklist.md` — step-by-step go-live checklist
-- `docs/fillout-setup.md` — Fillout intake structure and mapping
-- `docs/deployment-notes.md` — Vercel/domain/env deployment notes
-- `.env.production.example` — suggested production environment values
-- `n8n/credentials-checklist.md` — n8n credential/env checklist
+## Deploy
+- Put the values from `generated/vercel.env` into Vercel project env vars, or paste them directly from that file.
+- Put the values from `n8n/.env.generated` into your n8n environment.
+- Import the workflows from `n8n/workflows/`.
+- Confirm Airtable field names match `docs/airtable-schema.md`.
 
-## Next build steps
-1. Replace local repository reads with live Airtable tables once credentials are added
-2. Add proper user authentication/session management beyond invite links
-3. Connect uploads to cloud storage/provider of choice
-4. Import/configure the draft n8n workflows under `n8n/workflows/` and wire real providers
-5. Add production deployment config and branding polish
+## Current operational model
+- Cases load from Airtable when configured, otherwise sample data is used.
+- Portal invites are signed and stateless; they no longer rely on local invite files.
+- Uploads still default to local disk unless you route them onward through your automation/storage path.
+- Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
+
+## Remaining real-world caveats
+- Upload persistence is still local by default unless you connect a storage provider path.
+- n8n provider credentials themselves may still require manual entry in n8n depending on the service.
+- Real auth is still lightweight; portal access is invite-based.
+
+## Important docs
+- `docs/integration-checklist.md`
+- `docs/fillout-setup.md`
+- `docs/deployment-notes.md`
+- `docs/automation-implementation.md`
+- `n8n/README.md`

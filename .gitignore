@@ -3,3 +3,6 @@ node_modules
 .vercel
 .env.local
 .env.*.local
+keypoint.settings.json
+generated/
+n8n/.env.generated
