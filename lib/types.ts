@@ -15,6 +15,18 @@ export interface UploadRecord {
   path: string;
 }
 
+export interface CreateCaseInput {
+  leadName: string;
+  spouseName?: string;
+  phone: string;
+  email?: string;
+  caseType: string;
+  borrowerProfiles: string[];
+  assignedTo?: string;
+  notes?: string;
+  filloutSubmissionId?: string;
+}
+
 export interface ActionResult<T> {
   ok: boolean;
   data?: T;

@@ -5,6 +5,7 @@ KeyPoint is an Israel-focused mortgage advisor MVP built with Next.js, Airtable,
 ## What is ready now
 - Next.js app scaffold for overview, office dashboard, portal, docs, login, and signed invite links
 - Airtable-backed case loading through the repository layer
+- Live case creation endpoint and case-stage update endpoint
 - n8n webhook bridge for workflow forwarding and upload events
 - Draft workflow pack under `n8n/workflows/`
 - Single settings-file generator for app env + n8n env output
@@ -40,11 +41,21 @@ npm run dev
 - Import the workflows from `n8n/workflows/`.
 - Confirm Airtable field names match `docs/airtable-schema.md`.
 
+## Core API routes
+- `GET /api/cases` — list cases
+- `POST /api/cases` — create a live case in Airtable
+- `GET /api/cases/:caseId` — fetch a case
+- `PATCH /api/cases/:caseId` — update case stage
+- `POST /api/invites` — generate a signed invite link
+- `POST /api/uploads` — save an upload and forward the event to n8n
+- `POST /api/webhooks/n8n` — generic n8n forwarder
+
 ## Current operational model
 - Cases load from Airtable when configured, otherwise sample data is used.
 - Portal invites are signed and stateless; they no longer rely on local invite files.
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
+- When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
 
 ## Remaining real-world caveats
 - Upload persistence is still local by default unless you connect a storage provider path.

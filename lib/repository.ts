@@ -1,11 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { sampleCases, documentLibrary, type CaseRecord } from '@/data/domain';
+import { sampleCases, documentLibrary, type CaseRecord, type CaseStage } from '@/data/domain';
 import { env, hasAirtableConfig } from '@/lib/env';
-import { getAirtableCaseByCaseId, listAirtableCases } from '@/lib/airtable';
+import {
+  createAirtableActivityLog,
+  createAirtableCase,
+  createAirtableCaseDocument,
+  getAirtableCaseByCaseId,
+  listAirtableCases,
+  updateAirtableCaseStage,
+  updateAirtablePortalStatus,
+} from '@/lib/airtable';
 import { triggerN8n } from '@/lib/n8n';
-import type { PortalInvite, UploadRecord } from '@/lib/types';
+import type { CreateCaseInput, PortalInvite, UploadRecord } from '@/lib/types';
 
 const appRoot = process.cwd();
 const dataRoot = path.join(appRoot, 'data');
@@ -92,6 +100,30 @@ export async function getCase(caseId: string): Promise<CaseRecord | undefined> {
   return sampleCases.find((item) => item.id === caseId);
 }
 
+export async function createCase(input: CreateCaseInput) {
+  if (!hasAirtableConfig()) {
+    return { ok: false, error: 'Airtable must be configured to create live cases' } as const;
+  }
+
+  const created = await createAirtableCase(input);
+  if (!created.ok || !created.data) return created;
+
+  await createAirtableActivityLog(created.data.id, 'case-created', 'Case created from KeyPoint app');
+  return created;
+}
+
+export async function setCaseStage(caseId: string, stage: CaseStage) {
+  if (!hasAirtableConfig()) {
+    return { ok: false, error: 'Airtable must be configured to update case stage' } as const;
+  }
+
+  const updated = await updateAirtableCaseStage(caseId, stage);
+  if (updated.ok) {
+    await createAirtableActivityLog(caseId, 'stage-updated', `Case stage changed to ${stage}`);
+  }
+  return updated;
+}
+
 export async function getCaseChecklist(caseId: string) {
   const caseRecord = await getCase(caseId);
   if (!caseRecord) return [];
@@ -111,6 +143,11 @@ export async function createInvite(caseId: string): Promise<PortalInvite> {
   const token = makeInviteToken(caseRecord);
   const parsed = parseInviteToken(token);
   if (!parsed) throw new Error('Failed to create invite token');
+
+  if (hasAirtableConfig()) {
+    await updateAirtablePortalStatus(caseId, 'invited');
+    await createAirtableActivityLog(caseId, 'portal-invite-generated', 'Portal invite link generated');
+  }
 
   return { token, ...parsed };
 }
@@ -141,6 +178,11 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
 
   uploads.unshift(record);
   writeJson(uploadsFile, uploads);
+
+  if (hasAirtableConfig()) {
+    await createAirtableCaseDocument(record.caseId, record.documentCode, record.path);
+    await createAirtableActivityLog(record.caseId, 'document-uploaded', `${record.fileName} uploaded for ${record.documentCode}`);
+  }
 
   if (env.n8nWebhookBaseUrl) {
     await triggerN8n('keypoint/document-upload', {

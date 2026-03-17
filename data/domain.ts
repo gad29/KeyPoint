@@ -54,6 +54,7 @@ export interface CaseRecord {
   leadName: string;
   spouseName?: string;
   phone: string;
+  email?: string;
   stage: CaseStage;
   caseType: CaseType;
   borrowerProfiles: BorrowerProfile[];
@@ -61,6 +62,8 @@ export interface CaseRecord {
   assignedTo: string;
   bankTargets: string[];
   nextAction: string;
+  portalStatus?: string;
+  airtableRecordId?: string;
 }
 
 export interface BankOffer {
@@ -178,6 +181,7 @@ export const sampleCases: CaseRecord[] = [
     leadName: 'Noa Levi',
     spouseName: 'Amit Levi',
     phone: '+972-50-123-4567',
+    email: 'noa@example.com',
     stage: 'documents-in-progress',
     caseType: 'purchase-single-dwelling',
     borrowerProfiles: ['salaried'],
@@ -190,6 +194,7 @@ export const sampleCases: CaseRecord[] = [
     id: 'CASE-1038',
     leadName: 'Yossi Cohen',
     phone: '+972-52-222-3311',
+    email: 'yossi@example.com',
     stage: 'waiting-appraiser',
     caseType: 'renovation',
     borrowerProfiles: ['self-employed'],
@@ -202,6 +207,7 @@ export const sampleCases: CaseRecord[] = [
     id: 'CASE-1042',
     leadName: 'Maya Ben David',
     phone: '+972-54-555-8877',
+    email: 'maya@example.com',
     stage: 'bank-negotiation',
     caseType: 'discounted-program',
     borrowerProfiles: ['salaried', 'new-immigrant'],

@@ -1,6 +1,6 @@
 import { env, hasAirtableConfig } from '@/lib/env';
 import type { CaseRecord, CaseStage, CaseType, BorrowerProfile } from '@/data/domain';
-import type { ActionResult } from '@/lib/types';
+import type { ActionResult, CreateCaseInput } from '@/lib/types';
 
 const apiBase = 'https://api.airtable.com/v0';
 
@@ -13,6 +13,13 @@ type AirtableRecord<T = Record<string, unknown>> = {
 type AirtableListResponse<T = Record<string, unknown>> = {
   records: Array<AirtableRecord<T>>;
   offset?: string;
+};
+
+type AirtableCaseFields = Record<string, unknown>;
+
+type AirtableCaseEntity = {
+  recordId: string;
+  case: CaseRecord;
 };
 
 function isString(value: unknown): value is string {
@@ -43,11 +50,7 @@ function asStringArray(value: unknown): string[] {
 }
 
 function normalizeStage(value: unknown): CaseStage {
-  const raw = asString(value, 'new-lead')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-') as CaseStage;
-
+  const raw = asString(value, 'new-lead').trim().toLowerCase().replace(/\s+/g, '-') as CaseStage;
   const allowed: CaseStage[] = [
     'new-lead',
     'intake-submitted',
@@ -62,16 +65,11 @@ function normalizeStage(value: unknown): CaseStage {
     'recommendation-prepared',
     'completed',
   ];
-
   return allowed.includes(raw) ? raw : 'new-lead';
 }
 
 function normalizeCaseType(value: unknown): CaseType {
-  const raw = asString(value, 'purchase-single-dwelling')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-') as CaseType;
-
+  const raw = asString(value, 'purchase-single-dwelling').trim().toLowerCase().replace(/\s+/g, '-') as CaseType;
   const allowed: CaseType[] = [
     'purchase-single-dwelling',
     'purchase-replacement-dwelling',
@@ -82,7 +80,6 @@ function normalizeCaseType(value: unknown): CaseType {
     'self-build',
     'renovation',
   ];
-
   return allowed.includes(raw) ? raw : 'purchase-single-dwelling';
 }
 
@@ -101,7 +98,7 @@ function normalizeBorrowerProfiles(value: unknown): BorrowerProfile[] {
 }
 
 async function airtableRequest<T = Record<string, unknown>>(
-  table: string,
+  tableOrPath: string,
   init?: RequestInit,
   searchParams?: URLSearchParams,
 ): Promise<ActionResult<T>> {
@@ -109,7 +106,7 @@ async function airtableRequest<T = Record<string, unknown>>(
     return { ok: false, error: 'Airtable is not configured' };
   }
 
-  const url = new URL(`${apiBase}/${env.airtableBaseId}/${encodeURIComponent(table)}`);
+  const url = new URL(`${apiBase}/${env.airtableBaseId}/${tableOrPath}`);
   if (searchParams) {
     searchParams.forEach((value, key) => url.searchParams.set(key, value));
   }
@@ -128,8 +125,7 @@ async function airtableRequest<T = Record<string, unknown>>(
     return { ok: false, error: `Airtable request failed with ${res.status}` };
   }
 
-  const json = (await res.json()) as T;
-  return { ok: true, data: json };
+  return { ok: true, data: (await res.json()) as T };
 }
 
 export async function listAirtableRecords<T = Record<string, unknown>>(
@@ -142,7 +138,7 @@ export async function listAirtableRecords<T = Record<string, unknown>>(
 
   do {
     if (offset) searchParams.set('offset', offset);
-    const result = await airtableRequest<AirtableListResponse<T>>(table, undefined, searchParams);
+    const result = await airtableRequest<AirtableListResponse<T>>(encodeURIComponent(table), undefined, searchParams);
     if (!result.ok || !result.data) return { ok: false, error: result.error || 'Failed to list Airtable records' };
     all.push(...result.data.records);
     offset = result.data.offset;
@@ -152,14 +148,14 @@ export async function listAirtableRecords<T = Record<string, unknown>>(
 }
 
 export async function createAirtableRecord<T = Record<string, unknown>>(table: string, fields: T) {
-  return airtableRequest<{ id: string; fields: T }>(table, {
+  return airtableRequest<{ id: string; fields: T }>(encodeURIComponent(table), {
     method: 'POST',
     body: JSON.stringify({ fields }),
   });
 }
 
 export async function updateAirtableRecord<T = Record<string, unknown>>(table: string, recordId: string, fields: T) {
-  return airtableRequest<{ id: string; fields: T }>(`${table}/${recordId}`, {
+  return airtableRequest<{ id: string; fields: T }>(`${encodeURIComponent(table)}/${recordId}`, {
     method: 'PATCH',
     body: JSON.stringify({ fields }),
   });
@@ -179,7 +175,7 @@ export async function findAirtableRecordByField<T = Record<string, unknown>>(tab
   return { ok: true, data: result.data[0] } as const;
 }
 
-function mapAirtableCase(record: AirtableRecord): CaseRecord {
+function mapAirtableCase(record: AirtableRecord<AirtableCaseFields>): CaseRecord {
   const fields = record.fields;
   const caseId = asString(fields['Case ID'], record.id);
 
@@ -188,6 +184,7 @@ function mapAirtableCase(record: AirtableRecord): CaseRecord {
     leadName: asString(fields['Lead name'], 'Unknown lead'),
     spouseName: isString(fields['Spouse name']) ? fields['Spouse name'] : undefined,
     phone: asString(fields['Phone']),
+    email: isString(fields['Email']) ? fields['Email'] : undefined,
     stage: normalizeStage(fields['Current stage']),
     caseType: normalizeCaseType(fields['Case type']),
     borrowerProfiles: normalizeBorrowerProfiles(fields['Borrower profiles']),
@@ -195,11 +192,36 @@ function mapAirtableCase(record: AirtableRecord): CaseRecord {
     assignedTo: asString(fields['Assigned staff'], 'Unassigned'),
     bankTargets: asStringArray(fields['Bank targets']),
     nextAction: asString(fields['Next action'], 'Review case in office dashboard.'),
+    portalStatus: isString(fields['Client portal status']) ? fields['Client portal status'] : undefined,
+    airtableRecordId: record.id,
+  };
+}
+
+function makeCaseId() {
+  const serial = Math.floor(1000 + Math.random() * 9000);
+  return `CASE-${serial}`;
+}
+
+function mapCreateCaseFields(input: CreateCaseInput) {
+  return {
+    'Case ID': makeCaseId(),
+    'Lead name': input.leadName,
+    'Spouse name': input.spouseName || '',
+    Phone: input.phone,
+    Email: input.email || '',
+    'Case type': input.caseType,
+    'Borrower profiles': input.borrowerProfiles,
+    'Current stage': 'new-lead',
+    'Assigned staff': input.assignedTo || 'Unassigned',
+    'Missing items count': 0,
+    'Client portal status': 'not-invited',
+    'Fillout submission id': input.filloutSubmissionId || '',
+    Notes: input.notes || '',
   };
 }
 
 export async function listAirtableCases(): Promise<ActionResult<CaseRecord[]>> {
-  const result = await listAirtableRecords(env.airtableCasesTable, {
+  const result = await listAirtableRecords<AirtableCaseFields>(env.airtableCasesTable, {
     'sort[0][field]': 'Lead name',
     'sort[0][direction]': 'asc',
   });
@@ -211,16 +233,85 @@ export async function listAirtableCases(): Promise<ActionResult<CaseRecord[]>> {
   return { ok: true, data: result.data.map(mapAirtableCase) };
 }
 
+export async function getAirtableCaseEntityByCaseId(caseId: string): Promise<ActionResult<AirtableCaseEntity>> {
+  const result = await findAirtableRecordByField<AirtableCaseFields>(env.airtableCasesTable, 'Case ID', caseId);
+  if (!result.ok || !result.data) {
+    return { ok: false, error: result.error || 'Case not found in Airtable' };
+  }
+
+  return {
+    ok: true,
+    data: {
+      recordId: result.data.id,
+      case: mapAirtableCase(result.data),
+    },
+  };
+}
+
 export async function getAirtableCaseByCaseId(caseId: string): Promise<ActionResult<CaseRecord>> {
-  const result = await findAirtableRecordByField(env.airtableCasesTable, 'Case ID', caseId);
-  if (result.ok && result.data) {
-    return { ok: true, data: mapAirtableCase(result.data) };
+  const result = await getAirtableCaseEntityByCaseId(caseId);
+  if (!result.ok || !result.data) return { ok: false, error: result.error || 'Case not found in Airtable' };
+  return { ok: true, data: result.data.case };
+}
+
+export async function createAirtableCase(input: CreateCaseInput): Promise<ActionResult<CaseRecord>> {
+  const created = await createAirtableRecord(env.airtableCasesTable, mapCreateCaseFields(input));
+  if (!created.ok || !created.data) {
+    return { ok: false, error: created.error || 'Failed to create Airtable case' };
   }
 
-  const fallback = await airtableRequest<AirtableRecord>(`${env.airtableCasesTable}/${caseId}`);
-  if (!fallback.ok || !fallback.data) {
-    return { ok: false, error: result.error || fallback.error || 'Case not found in Airtable' };
+  const record = { id: created.data.id, fields: created.data.fields } satisfies AirtableRecord<AirtableCaseFields>;
+  return { ok: true, data: mapAirtableCase(record) };
+}
+
+export async function updateAirtableCaseStage(caseId: string, stage: CaseStage): Promise<ActionResult<CaseRecord>> {
+  const entity = await getAirtableCaseEntityByCaseId(caseId);
+  if (!entity.ok || !entity.data) return { ok: false, error: entity.error || 'Case not found' };
+
+  const updated = await updateAirtableRecord(env.airtableCasesTable, entity.data.recordId, { 'Current stage': stage });
+  if (!updated.ok || !updated.data) return { ok: false, error: updated.error || 'Failed to update case stage' };
+
+  const record = { id: updated.data.id, fields: updated.data.fields } satisfies AirtableRecord<AirtableCaseFields>;
+  return { ok: true, data: mapAirtableCase(record) };
+}
+
+export async function updateAirtablePortalStatus(caseId: string, portalStatus: string): Promise<ActionResult<CaseRecord>> {
+  const entity = await getAirtableCaseEntityByCaseId(caseId);
+  if (!entity.ok || !entity.data) return { ok: false, error: entity.error || 'Case not found' };
+
+  const updated = await updateAirtableRecord(env.airtableCasesTable, entity.data.recordId, { 'Client portal status': portalStatus });
+  if (!updated.ok || !updated.data) return { ok: false, error: updated.error || 'Failed to update portal status' };
+
+  const record = { id: updated.data.id, fields: updated.data.fields } satisfies AirtableRecord<AirtableCaseFields>;
+  return { ok: true, data: mapAirtableCase(record) };
+}
+
+export async function createAirtableActivityLog(caseId: string, eventType: string, summary: string, actor = 'KeyPoint app') {
+  const entity = await getAirtableCaseEntityByCaseId(caseId);
+  if (!entity.ok || !entity.data) {
+    return { ok: false, error: entity.error || 'Case not found for activity log' } as const;
   }
 
-  return { ok: true, data: mapAirtableCase(fallback.data) };
+  return createAirtableRecord(env.airtableActivityLogTable, {
+    'Case link': [entity.data.recordId],
+    Actor: actor,
+    'Event type': eventType,
+    Summary: summary,
+    'Source system': 'keypoint-app',
+    Timestamp: new Date().toISOString(),
+  });
+}
+
+export async function createAirtableCaseDocument(caseId: string, documentCode: string, fileUrl: string, status = 'uploaded') {
+  const entity = await getAirtableCaseEntityByCaseId(caseId);
+  if (!entity.ok || !entity.data) {
+    return { ok: false, error: entity.error || 'Case not found for document record' } as const;
+  }
+
+  return createAirtableRecord(env.airtableDocumentsTable, {
+    'Case link': [entity.data.recordId],
+    'Document code': documentCode,
+    Status: status,
+    'Uploaded file URL': fileUrl,
+  });
 }
