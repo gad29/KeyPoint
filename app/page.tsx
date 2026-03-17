@@ -16,13 +16,16 @@ export default async function HomePage() {
           <p className="eyebrow">Build status</p>
           <h2>{hasAirtableConfig() ? 'Live Airtable-backed case listing is enabled.' : 'KeyPoint is ready for live credentials.'}</h2>
           <p className="muted">
-            The app now supports a single settings-driven config flow, Airtable-backed case loading, signed portal invites,
+            The app now supports a native intake flow, Airtable-backed case loading, signed portal invites,
             and n8n-triggered upload events with local fallback for development.
           </p>
         </div>
-        <span className={`badge ${hasAirtableConfig() ? 'good' : 'warn'}`}>
-          {hasAirtableConfig() ? 'Live data mode available' : 'Awaiting live provider credentials'}
-        </span>
+        <div className="hero-actions">
+          <a className="button" href="/intake">Open native intake</a>
+          <span className={`badge ${hasAirtableConfig() ? 'good' : 'warn'}`}>
+            {hasAirtableConfig() ? 'Live data mode available' : 'Awaiting live provider credentials'}
+          </span>
+        </div>
       </section>
 
       <div className="grid cols-3">
@@ -35,7 +38,7 @@ export default async function HomePage() {
         <section className="card">
           <p className="eyebrow">Ready now</p>
           <ul className="list">
-            <li>Single settings file generator for app + n8n env output</li>
+            <li>Public native intake route with polished multi-step case submission</li>
             <li>Airtable-backed case loading through the repository layer</li>
             <li>Signed portal invite links that do not depend on local invite files</li>
             <li>Document upload event forwarding into n8n for downstream automation</li>

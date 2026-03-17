@@ -1,15 +1,16 @@
 # KeyPoint
 
-KeyPoint is an Israel-focused mortgage advisor MVP built with Next.js, Airtable, n8n, and Fillout.
+KeyPoint is an Israel-focused mortgage advisor MVP built with Next.js, Airtable, and n8n, with a native in-app intake flow now preferred over Fillout.
 
 ## What is ready now
-- Next.js app scaffold for overview, office dashboard, portal, docs, login, and signed invite links
+- Next.js app scaffold for overview, public intake, office dashboard, portal, docs, login, and signed invite links
+- Polished native multi-step intake under `/intake`
 - Airtable-backed case loading through the repository layer
 - Live case creation endpoint and case-stage update endpoint
 - n8n webhook bridge for workflow forwarding and upload events
-- Draft workflow pack under `n8n/workflows/`
+- Importable workflow pack under `n8n/workflows/`
 - Single settings-file generator for app env + n8n env output
-- Integration docs for Airtable, Fillout, deployment, and workflow rollout
+- Integration docs for Airtable, deployment, and workflow rollout
 
 ## Single settings file flow
 1. Copy the example:
@@ -41,9 +42,15 @@ npm run dev
 - Import the workflows from `n8n/workflows/`.
 - Confirm Airtable field names match `docs/airtable-schema.md`.
 
+## Core routes
+- `/intake` — public native intake flow
+- `/office` — staff dashboard
+- `/portal` — client portal shell
+- `/docs` — build/integration notes
+
 ## Core API routes
 - `GET /api/cases` — list cases
-- `POST /api/cases` — create a live case in Airtable
+- `POST /api/cases` — create a live case in Airtable or submit a native intake payload
 - `GET /api/cases/:caseId` — fetch a case
 - `PATCH /api/cases/:caseId` — update case stage
 - `POST /api/invites` — generate a signed invite link
@@ -52,9 +59,12 @@ npm run dev
 
 ## Current operational model
 - Cases load from Airtable when configured, otherwise sample data is used.
+- Native intake submits to `POST /api/cases` with `source: 'native-intake'` and generates an internal submission ID as the current replacement for the old Fillout submission reference.
+- The native intake flow serializes full intake answers into case notes for the MVP while still creating a clean case row.
 - Portal invites are signed and stateless; they no longer rely on local invite files.
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
+- When n8n is configured, native intake also forwards a normalized payload to `keypoint/fillout-intake` so the existing office automation path can continue working.
 - When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
 
 ## Remaining real-world caveats
@@ -64,7 +74,7 @@ npm run dev
 
 ## Important docs
 - `docs/integration-checklist.md`
-- `docs/fillout-setup.md`
 - `docs/deployment-notes.md`
 - `docs/automation-implementation.md`
+- `docs/n8n-workflows.md`
 - `n8n/README.md`

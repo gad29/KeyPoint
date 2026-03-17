@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listCases, createCase } from '@/lib/repository';
 import { hasAirtableConfig } from '@/lib/env';
+import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
+import { triggerN8n } from '@/lib/n8n';
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseBorrowerProfiles(value: unknown) {
+  return Array.isArray(value) ? value.map(String).filter(Boolean) : [];
+}
+
+function validateNativeIntake(intake: unknown): intake is IntakePayload {
+  if (!isObject(intake)) return false;
+  const applicant = intake.applicant;
+  const contact = intake.contact;
+  const incomeProfile = intake.incomeProfile;
+  const consent = intake.consent;
+
+  return (
+    isObject(applicant) &&
+    typeof applicant.fullName === 'string' &&
+    applicant.fullName.trim().length > 0 &&
+    isObject(contact) &&
+    typeof contact.phone === 'string' &&
+    contact.phone.trim().length > 0 &&
+    isObject(incomeProfile) &&
+    Array.isArray(incomeProfile.borrowerProfiles) &&
+    incomeProfile.borrowerProfiles.length > 0 &&
+    typeof intake.caseType === 'string' &&
+    isObject(consent) &&
+    consent.privacyAccepted === true &&
+    consent.advisorAuthorizationAccepted === true &&
+    consent.accuracyConfirmed === true
+  );
+}
 
 export async function GET() {
   const cases = await listCases();
@@ -14,10 +49,71 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
+
+  if (body?.source === 'native-intake') {
+    const intake = body?.intake;
+    if (!validateNativeIntake(intake)) {
+      return NextResponse.json(
+        { ok: false, error: 'Invalid intake payload. Applicant, phone, case type, income profile, and consent are required.' },
+        { status: 400 },
+      );
+    }
+
+    const submissionId = makeNativeIntakeSubmissionId();
+    const result = await createCase({
+      leadName: intake.applicant.fullName.trim(),
+      spouseName: intake.coApplicant.hasCoApplicant ? intake.coApplicant.fullName?.trim() || undefined : undefined,
+      phone: intake.contact.phone.trim(),
+      email: intake.contact.email?.trim() || undefined,
+      caseType: intake.caseType,
+      borrowerProfiles: intake.incomeProfile.borrowerProfiles,
+      notes: summarizeIntakeForNotes(intake),
+      submissionId,
+      stage: 'intake-submitted',
+      source: 'native-intake',
+    });
+
+    if (!result.ok || !result.data) {
+      return NextResponse.json(result, { status: 400 });
+    }
+
+    const automationPayload = {
+      submissionId,
+      caseId: result.data.id,
+      leadName: intake.applicant.fullName.trim(),
+      spouseName: intake.coApplicant.hasCoApplicant ? intake.coApplicant.fullName?.trim() || '' : '',
+      phone: intake.contact.phone.trim(),
+      email: intake.contact.email?.trim() || '',
+      preferredLanguage: intake.contact.preferredLanguage,
+      preferredChannel: intake.contact.preferredChannel,
+      caseType: intake.caseType,
+      borrowerProfiles: intake.incomeProfile.borrowerProfiles,
+      bankTargets: [],
+      notes: intake.notes || '',
+      source: 'native-intake',
+    };
+
+    const automation = await triggerN8n('keypoint/fillout-intake', automationPayload);
+
+    return NextResponse.json(
+      {
+        ok: true,
+        data: result.data,
+        meta: {
+          source: 'native-intake',
+          submissionId,
+          automationTriggered: automation.ok,
+          automation,
+        },
+      },
+      { status: 201 },
+    );
+  }
+
   const leadName = body?.leadName as string | undefined;
   const phone = body?.phone as string | undefined;
   const caseType = body?.caseType as string | undefined;
-  const borrowerProfiles = Array.isArray(body?.borrowerProfiles) ? body.borrowerProfiles.map(String) : [];
+  const borrowerProfiles = parseBorrowerProfiles(body?.borrowerProfiles);
 
   if (!leadName || !phone || !caseType || !borrowerProfiles.length) {
     return NextResponse.json(
@@ -36,6 +132,9 @@ export async function POST(req: NextRequest) {
     assignedTo: body?.assignedTo ? String(body.assignedTo) : undefined,
     notes: body?.notes ? String(body.notes) : undefined,
     filloutSubmissionId: body?.filloutSubmissionId ? String(body.filloutSubmissionId) : undefined,
+    submissionId: body?.submissionId ? String(body.submissionId) : undefined,
+    stage: body?.stage ? String(body.stage) : undefined,
+    source: body?.source ? String(body.source) : undefined,
   });
 
   return NextResponse.json(result, { status: result.ok ? 201 : 400 });

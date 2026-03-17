@@ -25,6 +25,9 @@ export interface CreateCaseInput {
   assignedTo?: string;
   notes?: string;
   filloutSubmissionId?: string;
+  submissionId?: string;
+  stage?: string;
+  source?: string;
 }
 
 export interface ActionResult<T> {

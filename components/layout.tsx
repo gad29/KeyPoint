@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import type { Route } from 'next';
 import type { ReactNode } from 'react';
 
-const nav: Array<{ href: Route; label: string }> = [
+const nav: Array<{ href: string; label: string }> = [
   { href: '/', label: 'Overview' },
+  { href: '/intake', label: 'Native Intake' },
   { href: '/portal', label: 'Client Portal' },
   { href: '/office', label: 'Office Dashboard' },
   { href: '/docs', label: 'Build Notes' },
@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <nav className="nav">
           {nav.map((item) => (
-            <Link key={item.href} href={item.href}>
+            <Link key={item.href} href={item.href as never}>
               {item.label}
             </Link>
           ))}

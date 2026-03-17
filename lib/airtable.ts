@@ -203,6 +203,7 @@ function makeCaseId() {
 }
 
 function mapCreateCaseFields(input: CreateCaseInput) {
+  const source = input.source ? `\n\nSource: ${input.source}` : '';
   return {
     'Case ID': makeCaseId(),
     'Lead name': input.leadName,
@@ -211,12 +212,12 @@ function mapCreateCaseFields(input: CreateCaseInput) {
     Email: input.email || '',
     'Case type': input.caseType,
     'Borrower profiles': input.borrowerProfiles,
-    'Current stage': 'new-lead',
+    'Current stage': input.stage || 'new-lead',
     'Assigned staff': input.assignedTo || 'Unassigned',
     'Missing items count': 0,
     'Client portal status': 'not-invited',
-    'Fillout submission id': input.filloutSubmissionId || '',
-    Notes: input.notes || '',
+    'Fillout submission id': input.filloutSubmissionId || input.submissionId || '',
+    Notes: `${input.notes || ''}${source}`.trim(),
   };
 }
 
