@@ -41,10 +41,16 @@ button, input, select, textarea { font: inherit; }
 .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); }
 .badge.good { color: var(--good); }
 .badge.warn { color: var(--warn); }
+.badge.danger { color: var(--danger); }
 .list { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; }
 .split { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .timeline { display: grid; gap: 12px; }
 .timeline .step { border-left: 2px solid var(--accent); padding-left: 14px; }
+.section-heading { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 16px; }
+.connection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.connection-card { padding: 16px; border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,0.03); }
+.connection-topline { align-items: center; margin-bottom: 10px; }
+.connection-value { margin: 0 0 10px; font-size: 18px; font-weight: 700; }
 pre { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
 .button { border: 1px solid rgba(124,156,255,0.25); background: linear-gradient(180deg, #7c9cff, #6080f0); color: white; padding: 11px 16px; border-radius: 14px; font-weight: 700; cursor: pointer; transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease; box-shadow: 0 12px 28px rgba(96,128,240,0.24); }
 .button:hover:not(:disabled) { transform: translateY(-1px); }

@@ -37,3 +37,57 @@ export function hasAirtableConfig() {
 export function hasLiveAppBaseUrl() {
   return Boolean(env.appBaseUrl && !env.appBaseUrl.includes('localhost'));
 }
+
+export function looksLikePlaceholder(value?: string | null) {
+  if (!value) return true;
+  return value.includes('example.com') || value.includes('change-me') || value.includes('replace-with-');
+}
+
+export function hasN8nConfig() {
+  return Boolean(env.n8nWebhookBaseUrl && !looksLikePlaceholder(env.n8nWebhookBaseUrl));
+}
+
+export function hasPortalInviteSecret() {
+  return Boolean(env.portalInviteSecret && !looksLikePlaceholder(env.portalInviteSecret));
+}
+
+export function hasOfficeAlertsConfig() {
+  return Boolean(env.officeAlertWebhookUrl && !looksLikePlaceholder(env.officeAlertWebhookUrl));
+}
+
+export function hasWhatsappConfig() {
+  return Boolean(
+    (!looksLikePlaceholder(env.whatsappProviderWebhookUrl) && env.whatsappProviderWebhookUrl) ||
+    (env.twilioAccountSid && env.twilioAuthToken && env.twilioWhatsappFrom),
+  );
+}
+
+export function hasSmsConfig() {
+  return Boolean(
+    (!looksLikePlaceholder(env.smsProviderWebhookUrl) && env.smsProviderWebhookUrl) ||
+    (env.twilioAccountSid && env.twilioAuthToken && env.twilioSmsFrom),
+  );
+}
+
+export function hasEmailConfig() {
+  return Boolean(
+    (!looksLikePlaceholder(env.emailProviderWebhookUrl) && env.emailProviderWebhookUrl) ||
+    (env.emailFromAddress && env.emailApiKey),
+  );
+}
+
+export function hasGoogleConfig() {
+  return Boolean(env.googleClientEmail && env.googlePrivateKey);
+}
+
+export function hasOcrConfig() {
+  return Boolean(env.documentOcrWebhookUrl && !looksLikePlaceholder(env.documentOcrWebhookUrl));
+}
+
+export function hasAiReviewConfig() {
+  return Boolean(env.aiReviewWebhookUrl && !looksLikePlaceholder(env.aiReviewWebhookUrl));
+}
+
+export function isLocalUploadMode() {
+  return !env.uploadPublicBaseUrl;
+}

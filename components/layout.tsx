@@ -6,6 +6,7 @@ const nav: Array<{ href: string; label: string }> = [
   { href: '/intake', label: 'Native Intake' },
   { href: '/portal', label: 'Client Portal' },
   { href: '/office', label: 'Office Dashboard' },
+  { href: '/connections', label: 'Connection Status' },
   { href: '/docs', label: 'Build Notes' },
 ];
 
