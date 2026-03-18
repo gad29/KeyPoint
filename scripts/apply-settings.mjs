@@ -21,9 +21,14 @@ function envBlock(values) {
     .join('\n') + '\n';
 }
 
+function looksLikePlaceholder(value) {
+  if (!value) return true;
+  return value.includes('example.com') || value.includes('change-me') || value.includes('replace-with-');
+}
+
 function deriveWebhook(explicitUrl, baseUrl, suffix) {
-  if (explicitUrl) return explicitUrl;
-  if (!baseUrl) return '';
+  if (explicitUrl && !looksLikePlaceholder(explicitUrl)) return explicitUrl;
+  if (!baseUrl || looksLikePlaceholder(baseUrl)) return '';
   return `${baseUrl.replace(/\/$/, '')}/${suffix.replace(/^\//, '')}`;
 }
 
@@ -107,14 +112,19 @@ fs.writeFileSync(
     '# KeyPoint generated connection summary',
     '',
     `- App base URL: ${appBaseUrl}`,
+    `- App base URL looks live: ${!looksLikePlaceholder(appBaseUrl) && !appBaseUrl.includes('localhost')}`,
+    `- Portal invite secret looks real: ${!looksLikePlaceholder(appEnv.PORTAL_INVITE_SECRET)}`,
     `- Airtable base configured: ${Boolean(appEnv.AIRTABLE_BASE_ID && appEnv.AIRTABLE_API_KEY)}`,
     `- n8n base URL: ${n8nBase || '(not set)'}`,
+    `- n8n base URL looks real: ${Boolean(n8nBase && !looksLikePlaceholder(n8nBase))}`,
+    `- Office alerts endpoint: ${appEnv.OFFICE_ALERT_WEBHOOK_URL || '(not set)'}`,
     `- WhatsApp endpoint: ${appEnv.WHATSAPP_PROVIDER_WEBHOOK_URL || '(not set)'}`,
     `- SMS endpoint: ${appEnv.SMS_PROVIDER_WEBHOOK_URL || '(not set)'}`,
     `- Email endpoint: ${appEnv.EMAIL_PROVIDER_WEBHOOK_URL || '(not set)'}`,
     `- OCR endpoint: ${appEnv.DOCUMENT_OCR_WEBHOOK_URL || '(not set)'}`,
     `- AI review endpoint: ${appEnv.AI_REVIEW_WEBHOOK_URL || '(not set)'}`,
     `- Upload mode: ${storage.mode || 'local'}`,
+    `- Upload public base URL set: ${Boolean(appEnv.UPLOAD_PUBLIC_BASE_URL)}`,
     '',
     'Generated files:',
     '- .env.local',
