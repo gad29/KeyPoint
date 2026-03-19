@@ -12,7 +12,7 @@
       ],
       "parameters": {
         "base": "={{ $env.AIRTABLE_BASE_ID }}",
-        "table": "Cases",
+        "table": "={{ $env.AIRTABLE_CASES_TABLE }}",
         "options": {
           "watchFor": "recordUpdated"
         }
@@ -99,20 +99,28 @@
       }
     },
     {
-      "id": "sendPortalInvite",
+      "id": "send-whatsapp-invite",
       "name": "Send WhatsApp invite",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
       "position": [
         1280,
         220
       ],
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.WHATSAPP_PROVIDER_WEBHOOK_URL }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { to: $json.phone, body: $json.message, template: \"portal_invite_he\" } }}"
+        "resource": "sms",
+        "operation": "send",
+        "from": "={{ $env.TWILIO_WHATSAPP_FROM }}",
+        "to": "={{ $json.phone }}",
+        "toWhatsapp": true,
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "credentials": {
+        "twilioApi": {
+          "id": "twilio-keypoint",
+          "name": "Twilio KeyPoint"
+        }
       }
     },
     {
@@ -132,7 +140,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Cases"
+          "value": "={{ $env.AIRTABLE_CASES_TABLE }}"
         },
         "id": "={{ $item(0).$node[\"Case approved trigger\"].json.id }}",
         "columns": {
@@ -164,7 +172,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Activity log"
+          "value": "={{ $env.AIRTABLE_ACTIVITY_LOG_TABLE }}"
         },
         "columns": {
           "mappingMode": "defineBelow",

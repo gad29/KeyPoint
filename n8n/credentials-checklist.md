@@ -27,6 +27,16 @@ Before enabling workflows in n8n, prepare these values.
 
 ## n8n credential names used by the workflow drafts
 - `Airtable KeyPoint`
+- `Twilio KeyPoint`
+
+## WhatsApp node choice
+- The workflow drafts now prefer the native `Twilio` node for WhatsApp sends.
+- Why: the project already models `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and sender numbers in `keypoint.settings.json`, so this is the safest/cleanest path with the current config model.
+- In the Twilio node, WhatsApp sends are done with:
+  - `resource = sms`
+  - `operation = send`
+  - `toWhatsapp = true`
+  - `from = {{$env.TWILIO_WHATSAPP_FROM}}`
 
 ## Before activation
 - Test every outbound provider endpoint with sample payloads

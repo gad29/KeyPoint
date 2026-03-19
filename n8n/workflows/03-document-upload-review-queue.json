@@ -45,12 +45,17 @@
             },
             {
               "name": "fileUrl",
-              "value": "={{ $json.body.fileUrl || $json.fileUrl }}",
+              "value": "={{ $json.body.fileUrl || $json.body.path || $json.fileUrl || $json.path }}",
               "type": "string"
             },
             {
               "name": "fileName",
               "value": "={{ $json.body.fileName || $json.fileName }}",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $json.body.phone || $json.phone || '' }}",
               "type": "string"
             }
           ]
@@ -74,7 +79,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Case documents"
+          "value": "={{ $env.AIRTABLE_DOCUMENTS_TABLE }}"
         },
         "id": "={{ $json.caseDocumentRecordId }}",
         "columns": {
@@ -144,7 +149,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Case documents"
+          "value": "={{ $env.AIRTABLE_DOCUMENTS_TABLE }}"
         },
         "id": "={{ $item(0).$node[\"Normalize upload event\"].json.caseDocumentRecordId }}",
         "columns": {
@@ -157,23 +162,6 @@
           "id": "airtable-keypoint",
           "name": "Airtable KeyPoint"
         }
-      }
-    },
-    {
-      "id": "notifyReviewer",
-      "name": "Notify review queue",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1820,
-        120
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { channel: \"office-review\", caseId: $item(0).$node[\"Normalize upload event\"].json.caseId, documentCode: $item(0).$node[\"Normalize upload event\"].json.documentCode, message: `מסמך חדש מוכן לבדיקה: ${$item(0).$node[\"Normalize upload event\"].json.documentCode}` } }}"
       }
     },
     {
@@ -193,7 +181,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Case documents"
+          "value": "={{ $env.AIRTABLE_DOCUMENTS_TABLE }}"
         },
         "id": "={{ $item(0).$node[\"Normalize upload event\"].json.caseDocumentRecordId }}",
         "columns": {
@@ -209,20 +197,28 @@
       }
     },
     {
-      "id": "requestResubmission",
+      "id": "request-resubmission",
       "name": "Request resubmission",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
       "position": [
         1820,
         340
       ],
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.WHATSAPP_PROVIDER_WEBHOOK_URL }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { caseId: $item(0).$node[\"Normalize upload event\"].json.caseId, template: \"document_resubmit_he\", body: `צריך להעלות מחדש את המסמך ${$item(0).$node[\"Normalize upload event\"].json.documentCode}: ${$json.reason || \"הקובץ לא קריא\"}` } }}"
+        "resource": "sms",
+        "operation": "send",
+        "from": "={{ $env.TWILIO_WHATSAPP_FROM }}",
+        "to": "={{ $item(0).$node[\"Normalize upload event\"].json.phone }}",
+        "toWhatsapp": true,
+        "message": "={{ `צריך להעלות מחדש את המסמך ${$item(0).$node[\"Normalize upload event\"].json.documentCode}: ${$json.reason || \"הקובץ לא קריא\"}` }}",
+        "options": {}
+      },
+      "credentials": {
+        "twilioApi": {
+          "id": "twilio-keypoint",
+          "name": "Twilio KeyPoint"
+        }
       }
     },
     {
@@ -307,7 +303,7 @@
       "main": [
         [
           {
-            "node": "Notify review queue",
+            "node": "Webhook response",
             "type": "main",
             "index": 0
           }
@@ -319,17 +315,6 @@
         [
           {
             "node": "Request resubmission",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Notify review queue": {
-      "main": [
-        [
-          {
-            "node": "Webhook response",
             "type": "main",
             "index": 0
           }

@@ -12,7 +12,7 @@
       ],
       "parameters": {
         "base": "={{ $env.AIRTABLE_BASE_ID }}",
-        "table": "Cases",
+        "table": "={{ $env.AIRTABLE_CASES_TABLE }}",
         "options": {
           "watchFor": "recordUpdated"
         }
@@ -62,7 +62,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Case documents"
+          "value": "={{ $env.AIRTABLE_DOCUMENTS_TABLE }}"
         },
         "additionalOptions": {
           "filterByFormula": "={{ \"AND(FIND(\"\" + $item(0).$node[\"AI review trigger\"].json.id + \"\", ARRAYJOIN({Case link})), {Status}=\"approved\")\" }}"
@@ -123,7 +123,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "AI reviews"
+          "value": "={{ $env.AIRTABLE_AI_REVIEWS_TABLE }}"
         },
         "columns": {
           "mappingMode": "defineBelow",

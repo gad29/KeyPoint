@@ -38,7 +38,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Bank runs"
+          "value": "={{ $env.AIRTABLE_BANK_RUNS_TABLE }}"
         },
         "additionalOptions": {
           "filterByFormula": "OR({Status}=\"requested\",{Status}=\"received\")"
@@ -133,7 +133,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Bank runs"
+          "value": "={{ $env.AIRTABLE_BANK_RUNS_TABLE }}"
         },
         "id": "={{ $json.id }}",
         "columns": {
@@ -165,7 +165,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Activity log"
+          "value": "={{ $env.AIRTABLE_ACTIVITY_LOG_TABLE }}"
         },
         "columns": {
           "mappingMode": "defineBelow",

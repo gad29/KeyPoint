@@ -12,7 +12,7 @@
       ],
       "parameters": {
         "base": "={{ $env.AIRTABLE_BASE_ID }}",
-        "table": "Cases",
+        "table": "={{ $env.AIRTABLE_CASES_TABLE }}",
         "options": {
           "watchFor": "recordUpdated"
         }
@@ -62,9 +62,9 @@
         },
         "table": {
           "mode": "name",
-          "value": "Appraisers"
+          "value": "={{ $env.AIRTABLE_APPRAISERS_TABLE }}"
         },
-        "filterByFormula": "={{ \"{Region}=\"\" + ($item(0).$node[\"Ready for appraisal trigger\"].json.fields.Region || \"Center\") + \"\"\" }}"
+        "filterByFormula": "={{ `{Region}='${$item(0).$node[\"Ready for appraisal trigger\"].json.fields.Region || 'Center'}'` }}"
       },
       "credentials": {
         "airtableTokenApi": {
@@ -105,20 +105,28 @@
       }
     },
     {
-      "id": "sendToAppraiser",
+      "id": "send-appraisal-request",
       "name": "Send appraisal request",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
       "position": [
         1300,
         220
       ],
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.WHATSAPP_PROVIDER_WEBHOOK_URL }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { to: $json.appraiserPhone, template: \"appraisal_dispatch_he\", body: $json.brief } }}"
+        "resource": "sms",
+        "operation": "send",
+        "from": "={{ $env.TWILIO_WHATSAPP_FROM }}",
+        "to": "={{ $json.appraiserPhone }}",
+        "toWhatsapp": true,
+        "message": "={{ $json.brief }}",
+        "options": {}
+      },
+      "credentials": {
+        "twilioApi": {
+          "id": "twilio-keypoint",
+          "name": "Twilio KeyPoint"
+        }
       }
     },
     {
@@ -138,7 +146,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Appraisal jobs"
+          "value": "={{ $env.AIRTABLE_APPRAISAL_JOBS_TABLE }}"
         },
         "columns": {
           "mappingMode": "defineBelow",

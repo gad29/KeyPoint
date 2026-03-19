@@ -179,18 +179,24 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
   uploads.unshift(record);
   writeJson(uploadsFile, uploads);
 
+  let caseDocumentRecordId = '';
   if (hasAirtableConfig()) {
-    await createAirtableCaseDocument(record.caseId, record.documentCode, record.path);
+    const createdDocument = await createAirtableCaseDocument(record.caseId, record.documentCode, record.path);
+    caseDocumentRecordId = createdDocument.ok && createdDocument.data?.id ? createdDocument.data.id : '';
     await createAirtableActivityLog(record.caseId, 'document-uploaded', `${record.fileName} uploaded for ${record.documentCode}`);
   }
 
   if (env.n8nWebhookBaseUrl) {
+    const caseRecord = await getCase(record.caseId);
     await triggerN8n('keypoint/document-upload', {
+      caseDocumentRecordId,
       caseId: record.caseId,
       documentCode: record.documentCode,
       fileName: record.fileName,
+      fileUrl: record.path,
       uploadedAt: record.uploadedAt,
       path: record.path,
+      phone: caseRecord?.phone || '',
     });
   }
 

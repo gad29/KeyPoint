@@ -72,7 +72,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Cases"
+          "value": "={{ $env.AIRTABLE_CASES_TABLE }}"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -103,7 +103,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Clients"
+          "value": "={{ $env.AIRTABLE_CLIENTS_TABLE }}"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -148,7 +148,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Case documents"
+          "value": "={{ $env.AIRTABLE_DOCUMENTS_TABLE }}"
         },
         "columns": {
           "mappingMode": "autoMapInputData"
@@ -178,7 +178,7 @@
         },
         "table": {
           "mode": "name",
-          "value": "Activity log"
+          "value": "={{ $env.AIRTABLE_ACTIVITY_LOG_TABLE }}"
         },
         "columns": {
           "mappingMode": "defineBelow",
@@ -190,23 +190,6 @@
           "id": "airtable-keypoint",
           "name": "Airtable KeyPoint"
         }
-      }
-    },
-    {
-      "id": "notifyOffice",
-      "name": "Notify office",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        1780,
-        220
-      ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ { caseId: $item(0).$node[\"Create case in Airtable\"].json.id, ...$json.officeNotification } }}"
       }
     },
     {
@@ -237,7 +220,7 @@
       ],
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { ok: true, caseId: $item(0).$node[\"Create case in Airtable\"].json.id, seededDocuments: $json.documentSeeds } }}"
+        "responseBody": "={{ { ok: true, caseId: $item(0).$node[\"Create case in Airtable\"].json.id, seededDocuments: $item(0).$node[\"Normalize intake payload\"].json.documentSeeds } }}"
       }
     }
   ],
@@ -289,16 +272,6 @@
             "node": "Create client in Airtable",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Log activity",
-            "type": "main",
-            "index": 0
-          },
-          {
-            "node": "Build case document rows",
-            "type": "main",
-            "index": 0
           }
         ]
       ]
@@ -318,7 +291,7 @@
       "main": [
         [
           {
-            "node": "Notify office",
+            "node": "Build case document rows",
             "type": "main",
             "index": 0
           }
@@ -329,7 +302,7 @@
       "main": [
         [
           {
-            "node": "Notify office",
+            "node": "Log activity",
             "type": "main",
             "index": 0
           }
@@ -337,17 +310,6 @@
       ]
     },
     "Log activity": {
-      "main": [
-        [
-          {
-            "node": "Notify office",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Notify office": {
       "main": [
         [
           {
