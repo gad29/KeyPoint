@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listCases, createCase } from '@/lib/repository';
 import { hasAirtableConfig } from '@/lib/env';
 import { createNativeIntakeCase } from '@/lib/airtable';
-import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
+import { buildNativeIntakeAutomationPayload, summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
 import { triggerN8n } from '@/lib/n8n';
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -79,21 +79,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    const automationPayload = {
+    const automationPayload = buildNativeIntakeAutomationPayload(intake, {
       submissionId,
       caseId: result.data.id,
-      leadName: intake.applicant.fullName.trim(),
-      spouseName: intake.coApplicant.hasCoApplicant ? intake.coApplicant.fullName?.trim() || '' : '',
-      phone: intake.contact.phone.trim(),
-      email: intake.contact.email?.trim() || '',
-      preferredLanguage: intake.contact.preferredLanguage,
-      preferredChannel: intake.contact.preferredChannel,
-      caseType: intake.caseType,
-      borrowerProfiles: intake.incomeProfile.borrowerProfiles,
-      bankTargets: [],
-      notes: intake.notes || '',
-      source: 'native-intake',
-    };
+    });
 
     const automation = await triggerN8n('keypoint/fillout-intake', automationPayload);
 

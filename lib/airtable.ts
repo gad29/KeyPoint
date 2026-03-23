@@ -1,7 +1,7 @@
 import { env, hasAirtableConfig } from '@/lib/env';
-import { documentLibrary, type CaseRecord, type CaseStage, type CaseType, type BorrowerProfile } from '@/data/domain';
+import type { CaseRecord, CaseStage, CaseType, BorrowerProfile } from '@/data/domain';
 import type { ActionResult, CreateCaseInput } from '@/lib/types';
-import type { IntakePayload } from '@/lib/intake';
+import { getRequiredDocumentCodes, type IntakePayload } from '@/lib/intake';
 
 const apiBase = 'https://api.airtable.com/v0';
 
@@ -201,16 +201,6 @@ function mapAirtableCase(record: AirtableRecord<AirtableCaseFields>): CaseRecord
 function makeCaseId() {
   const serial = Math.floor(1000 + Math.random() * 9000);
   return `CASE-${serial}`;
-}
-
-function getRequiredDocumentCodes(caseType: CaseType, borrowerProfiles: BorrowerProfile[]) {
-  return documentLibrary
-    .filter(
-      (doc) =>
-        (!doc.caseTypes || doc.caseTypes.includes(caseType)) &&
-        (!doc.borrowerProfiles || doc.borrowerProfiles.some((profile) => borrowerProfiles.includes(profile))),
-    )
-    .map((doc) => doc.code);
 }
 
 function mapCreateCaseFields(input: CreateCaseInput) {

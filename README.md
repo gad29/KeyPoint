@@ -65,7 +65,7 @@ npm run dev
 - Portal invites are signed and stateless; they no longer rely on local invite files.
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
-- When n8n is configured, native intake also forwards a normalized payload to `keypoint/fillout-intake` so the existing office automation path can continue working.
+- When n8n is configured, native intake also forwards a richer normalized payload to `keypoint/fillout-intake`, including applicant/co-applicant, contact, financial, property, consent, and required-document context so the existing office automation path can continue working without relying only on a few top-level fields.
 - When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
 
 ## Remaining real-world caveats

@@ -12,6 +12,8 @@
 - External calls:
   - office alert webhook
 
+Native KeyPoint intake now posts into the same `keypoint/fillout-intake` path with a richer normalized payload, so downstream workflow logic can reuse the same office automation entrypoint while still seeing structured applicant, financial, property, consent, and required-document context.
+
 ### 2) Office approval -> portal invite generation
 - Trigger: Airtable record update in `Cases`
 - Reads:
