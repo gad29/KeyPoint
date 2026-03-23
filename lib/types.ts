@@ -28,6 +28,8 @@ export interface CreateCaseInput {
   submissionId?: string;
   stage?: string;
   source?: string;
+  missingItemsCount?: number;
+  portalStatus?: string;
 }
 
 export interface ActionResult<T> {

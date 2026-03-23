@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listCases, createCase } from '@/lib/repository';
 import { hasAirtableConfig } from '@/lib/env';
+import { createNativeIntakeCase } from '@/lib/airtable';
 import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
 import { triggerN8n } from '@/lib/n8n';
 
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
 
     const submissionId = makeNativeIntakeSubmissionId();
-    const result = await createCase({
+    const result = await createNativeIntakeCase({
       leadName: intake.applicant.fullName.trim(),
       spouseName: intake.coApplicant.hasCoApplicant ? intake.coApplicant.fullName?.trim() || undefined : undefined,
       phone: intake.contact.phone.trim(),
@@ -71,6 +72,7 @@ export async function POST(req: NextRequest) {
       submissionId,
       stage: 'intake-submitted',
       source: 'native-intake',
+      intake,
     });
 
     if (!result.ok || !result.data) {
@@ -104,6 +106,8 @@ export async function POST(req: NextRequest) {
           submissionId,
           automationTriggered: automation.ok,
           automation,
+          seededDocuments: result.meta?.requiredDocumentCodes || [],
+          clientsCreated: result.meta?.clientsCreated || 0,
         },
       },
       { status: 201 },

@@ -1,6 +1,7 @@
 import { env, hasAirtableConfig } from '@/lib/env';
-import type { CaseRecord, CaseStage, CaseType, BorrowerProfile } from '@/data/domain';
+import { documentLibrary, type CaseRecord, type CaseStage, type CaseType, type BorrowerProfile } from '@/data/domain';
 import type { ActionResult, CreateCaseInput } from '@/lib/types';
+import type { IntakePayload } from '@/lib/intake';
 
 const apiBase = 'https://api.airtable.com/v0';
 
@@ -202,8 +203,20 @@ function makeCaseId() {
   return `CASE-${serial}`;
 }
 
+function getRequiredDocumentCodes(caseType: CaseType, borrowerProfiles: BorrowerProfile[]) {
+  return documentLibrary
+    .filter(
+      (doc) =>
+        (!doc.caseTypes || doc.caseTypes.includes(caseType)) &&
+        (!doc.borrowerProfiles || doc.borrowerProfiles.some((profile) => borrowerProfiles.includes(profile))),
+    )
+    .map((doc) => doc.code);
+}
+
 function mapCreateCaseFields(input: CreateCaseInput) {
   const source = input.source ? `\n\nSource: ${input.source}` : '';
+  const missingItemsCount = input.missingItemsCount ?? 0;
+  const portalStatus = input.portalStatus ?? 'not-invited';
   return {
     'Case ID': makeCaseId(),
     'Lead name': input.leadName,
@@ -214,8 +227,8 @@ function mapCreateCaseFields(input: CreateCaseInput) {
     'Borrower profiles': input.borrowerProfiles,
     'Current stage': input.stage || 'new-lead',
     'Assigned staff': input.assignedTo || 'Unassigned',
-    'Missing items count': 0,
-    'Client portal status': 'not-invited',
+    'Missing items count': missingItemsCount,
+    'Client portal status': portalStatus,
     'Fillout submission id': input.filloutSubmissionId || input.submissionId || '',
     Notes: `${input.notes || ''}${source}`.trim(),
   };
@@ -315,4 +328,109 @@ export async function createAirtableCaseDocument(caseId: string, documentCode: s
     Status: status,
     'Uploaded file URL': fileUrl,
   });
+}
+
+async function createAirtableClientForCaseRecord(recordId: string, fields: Record<string, unknown>) {
+  return createAirtableRecord(env.airtableClientsTable, {
+    ...fields,
+    'Case link': [recordId],
+  });
+}
+
+async function seedAirtableCaseDocumentsForRecord(recordId: string, caseType: CaseType, borrowerProfiles: BorrowerProfile[]) {
+  const documentCodes = getRequiredDocumentCodes(caseType, borrowerProfiles);
+
+  const results = await Promise.all(
+    documentCodes.map((documentCode) =>
+      createAirtableRecord(env.airtableDocumentsTable, {
+        'Case link': [recordId],
+        'Document code': documentCode,
+        'Required?': true,
+        Status: 'not-uploaded',
+      }),
+    ),
+  );
+
+  const failed = results.find((result) => !result.ok);
+  if (failed) {
+    return { ok: false, error: failed.error || 'Failed to seed case documents' } as const;
+  }
+
+  return { ok: true, data: documentCodes } as const;
+}
+
+export async function createNativeIntakeCase(input: CreateCaseInput & { intake: IntakePayload }) {
+  const normalizedCaseType = normalizeCaseType(input.caseType);
+  const normalizedBorrowerProfiles = normalizeBorrowerProfiles(input.borrowerProfiles);
+  const requiredDocumentCodes = getRequiredDocumentCodes(normalizedCaseType, normalizedBorrowerProfiles);
+  const created = await createAirtableRecord(
+    env.airtableCasesTable,
+    mapCreateCaseFields({
+      ...input,
+      missingItemsCount: requiredDocumentCodes.length,
+      portalStatus: 'pending-office-approval',
+      caseType: normalizedCaseType,
+      borrowerProfiles: normalizedBorrowerProfiles,
+    }),
+  );
+
+  if (!created.ok || !created.data) {
+    return { ok: false, error: created.error || 'Failed to create Airtable case' } as const;
+  }
+
+  const recordId = created.data.id;
+  const caseRecord = mapAirtableCase({ id: created.data.id, fields: created.data.fields });
+
+  const primaryClient = await createAirtableClientForCaseRecord(recordId, {
+    'Full name': input.intake.applicant.fullName.trim(),
+    'ID number': input.intake.applicant.idNumber?.trim() || '',
+    'Preferred language': input.intake.contact.preferredLanguage,
+    'WhatsApp number': input.intake.contact.phone.trim(),
+    Email: input.intake.contact.email?.trim() || '',
+  });
+
+  if (!primaryClient.ok) {
+    return { ok: false, error: primaryClient.error || 'Case was created but primary client creation failed' } as const;
+  }
+
+  if (input.intake.coApplicant.hasCoApplicant && input.intake.coApplicant.fullName?.trim()) {
+    const secondaryClient = await createAirtableClientForCaseRecord(recordId, {
+      'Full name': input.intake.coApplicant.fullName.trim(),
+      'ID number': input.intake.coApplicant.idNumber?.trim() || '',
+      'Preferred language': input.intake.contact.preferredLanguage,
+      'WhatsApp number': input.intake.contact.phone.trim(),
+      Email: input.intake.contact.email?.trim() || '',
+    });
+
+    if (!secondaryClient.ok) {
+      return { ok: false, error: secondaryClient.error || 'Case was created but co-applicant creation failed' } as const;
+    }
+  }
+
+  const seededDocuments = await seedAirtableCaseDocumentsForRecord(recordId, normalizedCaseType, normalizedBorrowerProfiles);
+  if (!seededDocuments.ok) {
+    return { ok: false, error: seededDocuments.error || 'Case was created but document checklist seeding failed' } as const;
+  }
+
+  const activity = await createAirtableRecord(env.airtableActivityLogTable, {
+    'Case link': [recordId],
+    Actor: 'system',
+    'Event type': 'intake_received',
+    Summary: 'Native intake captured and case seeded',
+    'Source system': 'native-intake',
+    Timestamp: new Date().toISOString(),
+  });
+
+  if (!activity.ok) {
+    return { ok: false, error: activity.error || 'Case was created but activity log creation failed' } as const;
+  }
+
+  return {
+    ok: true,
+    data: caseRecord,
+    meta: {
+      requiredDocumentCodes,
+      clientsCreated: input.intake.coApplicant.hasCoApplicant && input.intake.coApplicant.fullName?.trim() ? 2 : 1,
+    },
+  } as const;
 }

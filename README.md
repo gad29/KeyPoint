@@ -60,7 +60,8 @@ npm run dev
 ## Current operational model
 - Cases load from Airtable when configured, otherwise sample data is used.
 - Native intake submits to `POST /api/cases` with `source: 'native-intake'` and generates an internal submission ID as the current replacement for the old Fillout submission reference.
-- The native intake flow serializes full intake answers into case notes for the MVP while still creating a clean case row.
+- Native intake now creates a case row, primary client record, optional co-applicant client record, seeded case-document checklist rows, and an intake activity log in Airtable.
+- Full intake answers are still serialized into case notes for the MVP so office staff keeps the richer context even when a dedicated Airtable field does not exist yet.
 - Portal invites are signed and stateless; they no longer rely on local invite files.
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
