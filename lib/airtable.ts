@@ -219,7 +219,7 @@ function mapCreateCaseFields(input: CreateCaseInput) {
     'Assigned staff': input.assignedTo || 'Unassigned',
     'Missing items count': missingItemsCount,
     'Client portal status': portalStatus,
-    'Fillout submission id': input.filloutSubmissionId || input.submissionId || '',
+    'Fillout submission id': input.submissionId || '',
     Notes: `${input.notes || ''}${source}`.trim(),
   };
 }

@@ -3,7 +3,6 @@
 This folder contains importable **draft n8n workflow JSON** files for the Israel mortgage advisor MVP.
 
 ## What is included
-- `workflows/01-fillout-intake-airtable.json` — Fillout intake -> Airtable case/client creation + checklist seeding
 - `workflows/02-office-approval-portal-invite.json` — office approval -> portal invite generation
 - `workflows/03-document-upload-review-queue.json` — document upload review queue + OCR/resubmission path
 - `workflows/04-appraiser-dispatch.json` — appraisal dispatch and timeout follow-up
@@ -43,16 +42,16 @@ This folder contains importable **draft n8n workflow JSON** files for the Israel
 
 ## Assumptions baked into the drafts
 - Airtable is the operational system of record for the MVP
+- Native intake creation happens in the KeyPoint app itself
 - Portal invite generation uses the existing KeyPoint app `POST /api/invites`
 - OCR and AI review are externalized as webhook/API steps so the workflows stay vendor-neutral
 - Upload events can be forwarded from the app to `keypoint/document-upload`
 - The exports are meant to be practical starting points, not zero-touch production snapshots
 
 ## Recommended rollout order
-1. Workflow 1
-2. Workflow 2
-3. Workflow 3
-4. Workflow 7
-5. Workflow 4
-6. Workflow 5
-7. Workflow 6
+1. Workflow 02
+2. Workflow 03
+3. Workflow 07
+4. Workflow 04
+5. Workflow 05
+6. Workflow 06

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { listCases, createCase } from '@/lib/repository';
 import { hasAirtableConfig } from '@/lib/env';
 import { createNativeIntakeCase } from '@/lib/airtable';
-import { buildNativeIntakeAutomationPayload, summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
-import { triggerN8n } from '@/lib/n8n';
+import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -79,13 +78,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    const automationPayload = buildNativeIntakeAutomationPayload(intake, {
-      submissionId,
-      caseId: result.data.id,
-    });
-
-    const automation = await triggerN8n('keypoint/fillout-intake', automationPayload);
-
     return NextResponse.json(
       {
         ok: true,
@@ -93,8 +85,6 @@ export async function POST(req: NextRequest) {
         meta: {
           source: 'native-intake',
           submissionId,
-          automationTriggered: automation.ok,
-          automation,
           seededDocuments: result.meta?.requiredDocumentCodes || [],
           clientsCreated: result.meta?.clientsCreated || 0,
         },
@@ -124,7 +114,6 @@ export async function POST(req: NextRequest) {
     borrowerProfiles,
     assignedTo: body?.assignedTo ? String(body.assignedTo) : undefined,
     notes: body?.notes ? String(body.notes) : undefined,
-    filloutSubmissionId: body?.filloutSubmissionId ? String(body.filloutSubmissionId) : undefined,
     submissionId: body?.submissionId ? String(body.submissionId) : undefined,
     stage: body?.stage ? String(body.stage) : undefined,
     source: body?.source ? String(body.source) : undefined,

@@ -17,7 +17,7 @@ Fields:
 - Appraiser status
 - Recommendation status
 - Client portal status
-- Fillout submission id
+- Fillout submission id (legacy field currently reused to store the app-generated submission ID)
 - Notes
 
 ## 2. Clients

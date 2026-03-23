@@ -566,7 +566,7 @@ export function IntakeForm() {
               <div className="card nested-card">
                 <p className="eyebrow">Ready to submit</p>
                 <p className="muted">
-                  Submission will create a live case through the existing KeyPoint API flow and attach an internal submission ID in place of the old Fillout reference.
+                  Submission creates a live KeyPoint case directly through the app's own intake flow, with no external form dependency.
                 </p>
               </div>
             </div>

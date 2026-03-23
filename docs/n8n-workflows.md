@@ -3,13 +3,12 @@
 Concrete workflow artifacts now live under `n8n/workflows/`.
 
 ## Importable workflow files
-1. `n8n/workflows/01-fillout-intake-airtable.json`
-2. `n8n/workflows/02-office-approval-portal-invite.json`
-3. `n8n/workflows/03-document-upload-review-queue.json`
-4. `n8n/workflows/04-appraiser-dispatch.json`
-5. `n8n/workflows/05-bank-followup-reminders.json`
-6. `n8n/workflows/06-ai-review-handoff.json`
-7. `n8n/workflows/07-client-status-notifications.json`
+1. `n8n/workflows/02-office-approval-portal-invite.json`
+2. `n8n/workflows/03-document-upload-review-queue.json`
+3. `n8n/workflows/04-appraiser-dispatch.json`
+4. `n8n/workflows/05-bank-followup-reminders.json`
+5. `n8n/workflows/06-ai-review-handoff.json`
+6. `n8n/workflows/07-client-status-notifications.json`
 
 Additional implementation guidance lives in:
 - `n8n/README.md`
@@ -17,18 +16,12 @@ Additional implementation guidance lives in:
 
 ## Runtime assumptions
 - Airtable is the MVP source of truth.
+- Native intake case creation happens inside the KeyPoint app, not in n8n.
 - Existing KeyPoint API `POST /api/invites` is used for portal invite generation.
 - OCR, WhatsApp, email, and AI review remain provider-neutral HTTP steps for now.
 - Field names should match `docs/airtable-schema.md` exactly unless you update the imported workflows.
 
 ## Workflow summary
-
-### 1) Fillout intake -> Airtable case/client creation
-- Trigger: webhook `keypoint/fillout-intake`
-- Creates case + client records
-- Seeds required case documents
-- Logs intake activity
-- Sends office alert
 
 ### 2) Office approval -> portal invite generation
 - Trigger: Airtable update on `Cases`
@@ -71,7 +64,7 @@ Additional implementation guidance lives in:
 - Logs outbound activity
 
 ## MVP cautions
-- Add idempotency before production use, especially on Fillout intake and invite generation.
+- Native intake is now app-owned, so avoid reintroducing a second system that also creates cases.
 - Review Airtable linked-record handling after the live base is created.
 - Replace placeholder provider webhooks with signed, approved production integrations.
 - Test all Hebrew templates with real phone/email delivery paths before activation.

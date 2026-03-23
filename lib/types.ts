@@ -24,7 +24,6 @@ export interface CreateCaseInput {
   borrowerProfiles: string[];
   assignedTo?: string;
   notes?: string;
-  filloutSubmissionId?: string;
   submissionId?: string;
   stage?: string;
   source?: string;

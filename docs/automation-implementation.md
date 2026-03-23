@@ -2,17 +2,17 @@
 
 ## Workflow-to-table mapping
 
-### 1) Fillout intake -> Airtable case/client creation
-- Trigger: public Fillout webhook -> `keypoint/fillout-intake`
+### Intake creation
+- Trigger: native in-app intake -> `POST /api/cases`
 - Writes:
   - `Cases`
   - `Clients`
   - `Case documents`
   - `Activity log`
-- External calls:
-  - office alert webhook
-
-Native KeyPoint intake now posts into the same `keypoint/fillout-intake` path with a richer normalized payload, so downstream workflow logic can reuse the same office automation entrypoint while still seeing structured applicant, financial, property, consent, and required-document context.
+- Notes:
+  - intake creation is now handled directly in the app
+  - no active Fillout dependency remains
+  - n8n should be used for post-create automation, not duplicate case creation
 
 ### 2) Office approval -> portal invite generation
 - Trigger: Airtable record update in `Cases`
@@ -74,13 +74,13 @@ Native KeyPoint intake now posts into the same `keypoint/fillout-intake` path wi
 
 ## Airtable field alignment notes
 The existing schema doc is close, but the workflow exports assume these exact field labels:
-- Cases: `Lead name`, `Spouse name`, `Phone`, `Email`, `Case type`, `Borrower profiles`, `Current stage`, `Assigned staff`, `Missing items count`, `Client portal status`, `Fillout submission id`, `Notes`
+- Cases: `Lead name`, `Spouse name`, `Phone`, `Email`, `Case type`, `Borrower profiles`, `Current stage`, `Assigned staff`, `Missing items count`, `Client portal status`, `Fillout submission id` (legacy field currently reused for the app-generated submission ID), `Notes`
 - Clients: `Case link`, `Full name`, `ID number`, `Preferred language`, `WhatsApp number`, `Email`
 - Case documents: `Case link`, `Document code`, `Required?`, `Status`, `Uploaded file URL`, `OCR summary`, `Review notes`, `Requested resubmission at`, `Approved at`
 - Activity log: `Case link`, `Actor`, `Event type`, `Summary`, `Source system`, `Timestamp`
 
 ## Suggested production hardening before activation
-- add deduplication on Fillout submission ID
+- decide which post-intake automation should run immediately after native intake
 - enforce idempotency on invite creation and upload review
 - move WhatsApp/email text into Airtable or a proper template store
 - add dead-letter/error notifications for any failed external call

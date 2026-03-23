@@ -1,6 +1,6 @@
 # KeyPoint
 
-KeyPoint is an Israel-focused mortgage advisor MVP built with Next.js, Airtable, and n8n, with a native in-app intake flow now preferred over Fillout.
+KeyPoint is an Israel-focused mortgage advisor MVP built with Next.js, Airtable, and n8n, with a native in-app intake flow as the only active intake path.
 
 ## What is ready now
 - Next.js app scaffold for overview, public intake, office dashboard, portal, docs, login, and signed invite links
@@ -59,13 +59,13 @@ npm run dev
 
 ## Current operational model
 - Cases load from Airtable when configured, otherwise sample data is used.
-- Native intake submits to `POST /api/cases` with `source: 'native-intake'` and generates an internal submission ID as the current replacement for the old Fillout submission reference.
+- Native intake submits to `POST /api/cases` with `source: 'native-intake'` and generates an internal submission ID for traceability.
 - Native intake now creates a case row, primary client record, optional co-applicant client record, seeded case-document checklist rows, and an intake activity log in Airtable.
 - Full intake answers are still serialized into case notes for the MVP so office staff keeps the richer context even when a dedicated Airtable field does not exist yet.
 - Portal invites are signed and stateless; they no longer rely on local invite files.
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
-- When n8n is configured, native intake also forwards a richer normalized payload to `keypoint/fillout-intake`, including applicant/co-applicant, contact, financial, property, consent, and required-document context so the existing office automation path can continue working without relying only on a few top-level fields.
+- Native intake no longer depends on Fillout or the old intake webhook. Case creation happens directly in the app, and n8n remains available for post-create automation and document-processing workflows.
 - When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
 
 ## Remaining real-world caveats

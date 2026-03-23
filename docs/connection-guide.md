@@ -15,7 +15,6 @@ What Jade can automate:
 What still requires manual provider-side setup:
 - creating an Airtable token
 - creating the Airtable base/tables
-- creating/filling the Fillout form
 - importing workflows into n8n
 - verifying WhatsApp/SMS/email providers
 - creating Google service-account credentials if you want Google integrations
@@ -67,43 +66,30 @@ If the names do not match exactly, the app and workflows will fail when they que
 
 ---
 
-## 2. Fillout
+## 2. Native intake
 
 ### What it is used for
-Fillout is the public intake form.
-A new submission should trigger the n8n intake workflow.
+The built-in `/intake` flow is now the public intake front door for KeyPoint.
 
-### How to connect it
-1. Create a Fillout form called something like `KeyPoint Mortgage Intake`.
-2. Add the fields described in `docs/fillout-setup.md`.
-3. In Fillout, enable webhook delivery.
-4. Point the webhook at your n8n workflow-1 webhook URL.
-5. Make sure Fillout includes its submission ID in the payload.
-
-### What to map carefully
-These matter most:
-- full name
-- spouse/co-borrower info
-- phone
-- email
-- case type
-- borrower profiles
-- notes
-- submission ID
+### How it works
+1. A client submits the in-app multi-step intake flow.
+2. `POST /api/cases` validates the native intake payload.
+3. The app creates the case in Airtable directly.
+4. The app creates client records, seeds case-document checklist rows, and writes an activity log.
 
 ### Why this matters
-The submission ID is the dedupe key. Without it, the same submission can create duplicates.
+There is no active Fillout dependency anymore. Intake creation now lives inside the app, which makes the flow easier to test and control.
 
 ---
 
 ## 3. n8n
 
 ### What it is used for
-n8n is the automation layer between Fillout, Airtable, invites, uploads, WhatsApp, email, OCR, and AI review.
+n8n is the automation layer for post-intake orchestration, invites, uploads, WhatsApp, email, OCR, and AI review.
 
 ### How to connect it
 1. Open your n8n instance.
-2. Import all workflow JSON files from `apps/keypoint/n8n/workflows/`.
+2. Import the workflow JSON files from `apps/keypoint/n8n/workflows/`.
 3. Create the credential named:
    - `Airtable KeyPoint`
 4. After you fill `keypoint.settings.json`, run:
@@ -116,7 +102,7 @@ n8n is the automation layer between Fillout, Airtable, invites, uploads, WhatsAp
 7. Update any workflow nodes that still require explicit credentials or provider secrets.
 
 ### Why this matters
-The app itself handles UI + API. n8n handles orchestration and external actions.
+The app itself handles the intake UI and initial case creation. n8n handles orchestration and external actions after that.
 
 ---
 
@@ -141,6 +127,7 @@ This hosts the Next.js KeyPoint app.
 
 ### What to test after deploy
 - `/`
+- `/intake`
 - `/office`
 - `/portal`
 - `/login`
@@ -225,7 +212,7 @@ Fallback client notifications and office alerts.
    - `connections.email.webhookUrl`
 
 ### Why this matters
-Workflow 7 expects email fallback capability.
+Client notification workflows still expect email fallback capability.
 
 ---
 
@@ -331,8 +318,8 @@ This generates:
 ## 13. Recommended actual order
 Do it in this order:
 1. Airtable
-2. n8n
-3. Fillout
+2. Native intake
+3. n8n
 4. Vercel deploy
 5. WhatsApp/SMS/email provider wiring
 6. OCR / AI review
@@ -345,4 +332,4 @@ Do it in this order:
 Best next repo-side improvement:
 - add a built-in admin "connection status" screen that checks which envs are present and which are still missing
 
-That would make setup less blind.
+That makes setup much less blind.
