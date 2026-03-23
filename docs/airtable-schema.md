@@ -33,6 +33,13 @@ Fields:
 - Portal invited at
 - Last portal activity
 
+## Current live-base compatibility note
+The current live KeyPoint Airtable base is flatter than the idealized schema above:
+- `Cases.Borrower profiles` is currently text, not a true multi-select field
+- `Clients.Case link`, `Case documents.Case link`, and `Activity log.Case link` are currently text, not linked records
+
+The app now writes to the live base in that compatible text-first format so native intake works end-to-end against the existing production Airtable base.
+
 ## 3. Document library
 Master list of supported documents.
 
