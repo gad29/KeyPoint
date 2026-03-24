@@ -1,0 +1,143 @@
+{
+  "name": "KeyPoint | Native intake post-create kickoff",
+  "nodes": [
+    {
+      "id": "nativeIntakeWebhook",
+      "name": "Native intake created webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 280],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "keypoint/native-intake-created",
+        "responseMode": "responseNode"
+      }
+    },
+    {
+      "id": "normalizeNativeIntake",
+      "name": "Normalize native intake event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [500, 280],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "name": "caseId",
+              "value": "={{ $json.body.caseId || $json.caseId || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "submissionId",
+              "value": "={{ $json.body.submissionId || $json.submissionId || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "leadName",
+              "value": "={{ $json.body.leadName || $json.leadName || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "phone",
+              "value": "={{ $json.body.phone || $json.phone || '' }}",
+              "type": "string"
+            },
+            {
+              "name": "caseType",
+              "value": "={{ $json.body.caseType || $json.caseType || '' }}",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "logOfficeQueue",
+      "name": "Log office review queue",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [780, 280],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "Activity log"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { 'Case link': $json.caseId, Actor: 'office-automation', 'Event type': 'office_review_queued', Summary: 'Native intake queued for office review', 'Source system': 'n8n', Timestamp: new Date().toISOString() } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "returnQueued",
+      "name": "Return success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1040, 280],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, queued: true } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Native intake created webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize native intake event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize native intake event": {
+      "main": [
+        [
+          {
+            "node": "Log office review queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log office review queue": {
+      "main": [
+        [
+          {
+            "node": "Return success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": [
+    "keypoint",
+    "mortgage-mvp",
+    "israel"
+  ],
+  "versionId": "1"
+}

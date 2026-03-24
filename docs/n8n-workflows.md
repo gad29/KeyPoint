@@ -3,12 +3,13 @@
 Concrete workflow artifacts now live under `n8n/workflows/`.
 
 ## Importable workflow files
-1. `n8n/workflows/02-office-approval-portal-invite.json`
-2. `n8n/workflows/03-document-upload-review-queue.json`
-3. `n8n/workflows/04-appraiser-dispatch.json`
-4. `n8n/workflows/05-bank-followup-reminders.json`
-5. `n8n/workflows/06-ai-review-handoff.json`
-6. `n8n/workflows/07-client-status-notifications.json`
+1. `n8n/workflows/01-native-intake-post-create.json`
+2. `n8n/workflows/02-office-approval-portal-invite.json`
+3. `n8n/workflows/03-document-upload-review-queue.json`
+4. `n8n/workflows/04-appraiser-dispatch.json`
+5. `n8n/workflows/05-bank-followup-reminders.json`
+6. `n8n/workflows/06-ai-review-handoff.json`
+7. `n8n/workflows/07-client-status-notifications.json`
 
 Additional implementation guidance lives in:
 - `n8n/README.md`
@@ -22,6 +23,12 @@ Additional implementation guidance lives in:
 - Field names should match `docs/airtable-schema.md` exactly unless you update the imported workflows.
 
 ## Workflow summary
+
+### 1) Native intake post-create kickoff
+- Trigger: webhook `keypoint/native-intake-created`
+- Logs that the new intake is queued for office review
+- Optionally forwards an office alert if `OFFICE_ALERT_WEBHOOK_URL` is configured in n8n
+- Does not create duplicate case/client/checklist rows
 
 ### 2) Office approval -> portal invite generation
 - Trigger: Airtable update on `Cases`
@@ -65,6 +72,7 @@ Additional implementation guidance lives in:
 
 ## MVP cautions
 - Native intake is now app-owned, so avoid reintroducing a second system that also creates cases.
+- Rebuild the automation layer around the minimal MVP set first; see `docs/n8n-rebuild-plan.md`.
 - Review Airtable linked-record handling after the live base is created.
 - Replace placeholder provider webhooks with signed, approved production integrations.
 - Test all Hebrew templates with real phone/email delivery paths before activation.

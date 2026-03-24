@@ -17,6 +17,7 @@ export async function triggerN8n(pathname: string, payload: unknown) {
   }
 
   const contentType = res.headers.get('content-type') || '';
-  const data = contentType.includes('application/json') ? await res.json() : await res.text();
+  const text = await res.text();
+  const data = contentType.includes('application/json') ? (text.trim() ? JSON.parse(text) : null) : text;
   return { ok: true, data } as const;
 }

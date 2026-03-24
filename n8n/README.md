@@ -3,6 +3,7 @@
 This folder contains importable **draft n8n workflow JSON** files for the Israel mortgage advisor MVP.
 
 ## What is included
+- `workflows/01-native-intake-post-create.json` — native intake post-create kickoff + office-review queue logging
 - `workflows/02-office-approval-portal-invite.json` — office approval -> portal invite generation
 - `workflows/03-document-upload-review-queue.json` — document upload review queue + OCR/resubmission path
 - `workflows/04-appraiser-dispatch.json` — appraisal dispatch and timeout follow-up
@@ -49,9 +50,14 @@ This folder contains importable **draft n8n workflow JSON** files for the Israel
 - The exports are meant to be practical starting points, not zero-touch production snapshots
 
 ## Recommended rollout order
-1. Workflow 02
-2. Workflow 03
-3. Workflow 07
-4. Workflow 04
-5. Workflow 05
-6. Workflow 06
+Reset around the minimal MVP set first:
+1. Workflow 01 — native intake kickoff
+2. Workflow 03 — document upload review queue
+3. Workflow 02 — office approval -> portal invite
+4. Workflow 07 — client status notifications
+5. Workflow 04 — appraiser dispatch
+6. Workflow 05 — bank follow-up reminders
+7. Workflow 06 — AI review handoff
+
+See also:
+- `docs/n8n-rebuild-plan.md`
