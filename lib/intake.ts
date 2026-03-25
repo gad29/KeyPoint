@@ -1,24 +1,24 @@
 import { documentLibrary, type BorrowerProfile, type CaseType } from '@/data/domain';
 
-export const caseTypeOptions: Array<{ value: CaseType; label: string; hint: string }> = [
-  { value: 'purchase-single-dwelling', label: 'Purchase · single dwelling', hint: 'First or only home purchase.' },
-  { value: 'purchase-replacement-dwelling', label: 'Purchase · replacement dwelling', hint: 'Selling one home and buying another.' },
-  { value: 'purchase-investment-dwelling', label: 'Purchase · investment dwelling', hint: 'Additional / investment property.' },
-  { value: 'refinance', label: 'Refinance', hint: 'Improve an existing mortgage structure.' },
-  { value: 'all-purpose-against-home', label: 'All-purpose against existing home', hint: 'Raise funds against owned property.' },
-  { value: 'discounted-program', label: 'Discounted program', hint: 'Programs such as מחיר למשתכן / דירה בהנחה.' },
-  { value: 'self-build', label: 'Self build', hint: 'Construction-based financing flow.' },
-  { value: 'renovation', label: 'Renovation', hint: 'Renovation / improvement financing.' },
+export const caseTypeOptions: Array<{ value: CaseType; label: { en: string; he: string }; hint: { en: string; he: string } }> = [
+  { value: 'purchase-single-dwelling', label: { en: 'Purchase · single dwelling', he: 'רכישה · דירה יחידה' }, hint: { en: 'First or only home purchase.', he: 'רכישת דירה ראשונה או יחידה.' } },
+  { value: 'purchase-replacement-dwelling', label: { en: 'Purchase · replacement dwelling', he: 'רכישה · דירה חלופית' }, hint: { en: 'Selling one home and buying another.', he: 'מכירת דירה קיימת ורכישת דירה אחרת.' } },
+  { value: 'purchase-investment-dwelling', label: { en: 'Purchase · investment dwelling', he: 'רכישה · דירה להשקעה' }, hint: { en: 'Additional / investment property.', he: 'רכישת נכס נוסף או נכס להשקעה.' } },
+  { value: 'refinance', label: { en: 'Refinance', he: 'מחזור משכנתא' }, hint: { en: 'Improve an existing mortgage structure.', he: 'שיפור מבנה המשכנתא הקיימת.' } },
+  { value: 'all-purpose-against-home', label: { en: 'All-purpose against existing home', he: 'לכל מטרה על נכס קיים' }, hint: { en: 'Raise funds against owned property.', he: 'גיוס כספים כנגד נכס קיים.' } },
+  { value: 'discounted-program', label: { en: 'Discounted program', he: 'תוכנית מוזלת' }, hint: { en: 'Programs such as מחיר למשתכן / דירה בהנחה.', he: 'תוכניות כמו מחיר למשתכן או דירה בהנחה.' } },
+  { value: 'self-build', label: { en: 'Self build', he: 'בנייה עצמית' }, hint: { en: 'Construction-based financing flow.', he: 'מימון לפרויקט בנייה עצמית.' } },
+  { value: 'renovation', label: { en: 'Renovation', he: 'שיפוץ' }, hint: { en: 'Renovation / improvement financing.', he: 'מימון לשיפוץ או השבחת נכס.' } },
 ];
 
-export const borrowerProfileOptions: Array<{ value: BorrowerProfile; label: string; hint: string }> = [
-  { value: 'salaried', label: 'Salaried', hint: 'Payslips / salary based income.' },
-  { value: 'self-employed', label: 'Self-employed', hint: 'CPA and tax-return based income.' },
-  { value: 'student', label: 'Student', hint: 'Study-related proof or stipend support.' },
-  { value: 'benefits', label: 'Benefits', hint: 'Government / support benefits.' },
-  { value: 'pensioner', label: 'Pensioner', hint: 'Pension or retirement income.' },
-  { value: 'new-immigrant', label: 'New immigrant', hint: 'Recent aliyah / immigrant profile.' },
-  { value: 'foreign-income', label: 'Foreign income', hint: 'Income sourced outside Israel.' },
+export const borrowerProfileOptions: Array<{ value: BorrowerProfile; label: { en: string; he: string }; hint: { en: string; he: string } }> = [
+  { value: 'salaried', label: { en: 'Salaried', he: 'שכיר' }, hint: { en: 'Payslips / salary based income.', he: 'הכנסה המבוססת על תלושי שכר.' } },
+  { value: 'self-employed', label: { en: 'Self-employed', he: 'עצמאי' }, hint: { en: 'CPA and tax-return based income.', he: 'הכנסה המבוססת על אישור רו״ח ודוחות.' } },
+  { value: 'student', label: { en: 'Student', he: 'סטודנט / אברך' }, hint: { en: 'Study-related proof or stipend support.', he: 'הכנסה או תמיכה הקשורה ללימודים או כולל.' } },
+  { value: 'benefits', label: { en: 'Benefits', he: 'קצבאות' }, hint: { en: 'Government / support benefits.', he: 'קצבאות או תמיכות מהמוסדות.' } },
+  { value: 'pensioner', label: { en: 'Pensioner', he: 'פנסיונר' }, hint: { en: 'Pension or retirement income.', he: 'הכנסה מפנסיה או קצבת פרישה.' } },
+  { value: 'new-immigrant', label: { en: 'New immigrant', he: 'עולה חדש' }, hint: { en: 'Recent aliyah / immigrant profile.', he: 'פרופיל של עולה חדש או עליה recent.' } },
+  { value: 'foreign-income', label: { en: 'Foreign income', he: 'הכנסה מחו״ל' }, hint: { en: 'Income sourced outside Israel.', he: 'הכנסה שמקורה מחוץ לישראל.' } },
 ];
 
 export type IntakePayload = {

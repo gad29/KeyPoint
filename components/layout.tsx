@@ -1,34 +1,62 @@
+'use client';
+
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { I18nProvider, LanguageSwitch, useI18n } from '@/components/i18n';
 
-const nav: Array<{ href: string; label: string }> = [
-  { href: '/', label: 'Overview' },
-  { href: '/intake', label: 'Native Intake' },
-  { href: '/portal', label: 'Client Portal' },
-  { href: '/office', label: 'Office Dashboard' },
-  { href: '/connections', label: 'Connection Status' },
-  { href: '/docs', label: 'Build Notes' },
+const nav = [
+  { href: '/', label: { en: 'Home', he: 'דף הבית' } },
+  { href: '/intake', label: { en: 'New Case', he: 'פתיחת תיק' } },
+  { href: '/portal', label: { en: 'Client Portal', he: 'אזור לקוחות' } },
+  { href: '/office', label: { en: 'Office', he: 'משרד' } },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+const shellCopy = {
+  en: {
+    name: 'KeyPoint',
+    title: 'Mortgage case management, built for real work',
+    subtitle: 'A clean bilingual workspace for intake, case progress, client communication, and document collection.',
+  },
+  he: {
+    name: 'KeyPoint',
+    title: 'ניהול תיקי משכנתא — בצורה מסודרת, ברורה ומקצועית',
+    subtitle: 'מערכת דו-לשונית לניהול לידים, פתיחת תיקים, מעקב התקדמות, תקשורת עם לקוחות ואיסוף מסמכים.',
+  },
+};
+
+function AppFrame({ children }: { children: ReactNode }) {
+  const { language, dir } = useI18n();
+  const copy = shellCopy[language];
+
   return (
-    <div className="shell">
+    <div className="shell" dir={dir}>
       <aside className="sidebar">
-        <div>
-          <p className="eyebrow">KeyPoint</p>
-          <h1>Phase 1 MVP</h1>
-          <p className="muted">Israel-focused intake, document review, appraiser routing, and bank-stage tracking.</p>
+        <div className="sidebar-top">
+          <div>
+            <p className="eyebrow">{copy.name}</p>
+            <h1>{copy.title}</h1>
+            <p className="muted">{copy.subtitle}</p>
+          </div>
+          <LanguageSwitch />
         </div>
         <nav className="nav">
           {nav.map((item) => (
             <Link key={item.href} href={item.href as never}>
-              {item.label}
+              {item.label[language]}
             </Link>
           ))}
         </nav>
       </aside>
       <main className="content">{children}</main>
     </div>
+  );
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <I18nProvider>
+      <AppFrame>{children}</AppFrame>
+    </I18nProvider>
   );
 }
 

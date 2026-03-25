@@ -4,7 +4,7 @@ import { AppShell } from '@/components/layout';
 
 export const metadata: Metadata = {
   title: 'KeyPoint',
-  description: 'Client portal and office dashboard scaffold for an Israel-focused mortgage advisor workflow.',
+  description: 'Bilingual mortgage case management for intake, client communication, and office operations.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
