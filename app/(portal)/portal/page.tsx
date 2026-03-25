@@ -1,5 +1,4 @@
-import { documentLibrary } from '@/data/domain';
-import { listCases } from '@/lib/repository';
+import { listCases, getCaseChecklist } from '@/lib/repository';
 
 const portalStages = [
   'Intake submitted',
@@ -23,6 +22,8 @@ export default async function PortalPage() {
       </section>
     );
   }
+
+  const requiredDocuments = (await getCaseChecklist(caseRecord.id)).filter((doc) => doc.required);
 
   return (
     <div className="grid cols-2">
@@ -50,7 +51,7 @@ export default async function PortalPage() {
             </tr>
           </thead>
           <tbody>
-            {documentLibrary.slice(0, 8).map((doc) => (
+            {requiredDocuments.map((doc) => (
               <tr key={doc.code}>
                 <td>
                   <strong>{doc.labelEn}</strong>
