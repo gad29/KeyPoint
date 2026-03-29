@@ -9,12 +9,10 @@
   - `Clients`
   - `Case documents`
   - `Activity log`
-- External calls:
-  - n8n webhook `keypoint/native-intake-created`
 - Notes:
   - intake creation is now handled directly in the app
   - no active Fillout dependency remains
-  - n8n post-create kickoff logs office review queue state and can forward office alerts when configured
+  - n8n rebuild is being shifted toward Airtable-triggered post-create automation instead of app-triggered webhook kickoff, because the live n8n instance showed webhook-registration quirks
   - n8n should be used for post-create automation, not duplicate case creation
 
 ### 2) Office approval -> portal invite generation

@@ -65,7 +65,7 @@ npm run dev
 - Portal invites are signed and stateless; they no longer rely on local invite files.
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
-- Native intake no longer depends on Fillout or the old intake webhook. Case creation happens directly in the app, and n8n is now used for a separate `keypoint/native-intake-created` post-create kickoff path plus document-processing workflows.
+- Native intake no longer depends on Fillout or the old intake webhook. Case creation happens directly in the app, and the n8n rebuild is being reset around Airtable-triggered post-create automation plus document-processing workflows.
 - When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
 
 ## Remaining real-world caveats

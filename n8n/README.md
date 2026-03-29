@@ -51,7 +51,7 @@ This folder contains importable **draft n8n workflow JSON** files for the Israel
 
 ## Recommended rollout order
 Reset around the minimal MVP set first:
-1. Workflow 01 — native intake kickoff
+1. Workflow 01 — native intake office queue kickoff
 2. Workflow 03 — document upload review queue
 3. Workflow 02 — office approval -> portal invite
 4. Workflow 07 — client status notifications
@@ -61,3 +61,4 @@ Reset around the minimal MVP set first:
 
 See also:
 - `docs/n8n-rebuild-plan.md`
+

@@ -24,8 +24,9 @@ Additional implementation guidance lives in:
 
 ## Workflow summary
 
-### 1) Native intake post-create kickoff
-- Trigger: webhook `keypoint/native-intake-created`
+### 1) Native intake office queue kickoff
+- Trigger: Airtable case update in `Cases`
+- Filters for `Current stage = intake-submitted` and `Client portal status = pending-office-approval`
 - Logs that the new intake is queued for office review
 - Optionally forwards an office alert if `OFFICE_ALERT_WEBHOOK_URL` is configured in n8n
 - Does not create duplicate case/client/checklist rows

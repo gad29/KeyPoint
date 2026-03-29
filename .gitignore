@@ -6,3 +6,4 @@ node_modules
 keypoint.settings.json
 generated/
 n8n/.env.generated
+tsconfig.tsbuildinfo

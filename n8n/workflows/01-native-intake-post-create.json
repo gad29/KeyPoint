@@ -1,75 +1,17 @@
 {
-  "name": "KeyPoint | Native intake post-create kickoff",
+  "name": "KeyPoint | Native intake office queue kickoff",
   "nodes": [
     {
-      "id": "nativeIntakeWebhook",
-      "name": "Native intake created webhook",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
+      "id": "intakeTrigger",
+      "name": "Intake submitted trigger",
+      "type": "n8n-nodes-base.airtableTrigger",
+      "typeVersion": 1,
       "position": [220, 280],
       "parameters": {
-        "httpMethod": "POST",
-        "path": "keypoint/native-intake-created",
-        "responseMode": "responseNode"
-      }
-    },
-    {
-      "id": "normalizeNativeIntake",
-      "name": "Normalize native intake event",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 3.4,
-      "position": [500, 280],
-      "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "name": "caseId",
-              "value": "={{ $json.body.caseId || $json.caseId || '' }}",
-              "type": "string"
-            },
-            {
-              "name": "submissionId",
-              "value": "={{ $json.body.submissionId || $json.submissionId || '' }}",
-              "type": "string"
-            },
-            {
-              "name": "leadName",
-              "value": "={{ $json.body.leadName || $json.leadName || '' }}",
-              "type": "string"
-            },
-            {
-              "name": "phone",
-              "value": "={{ $json.body.phone || $json.phone || '' }}",
-              "type": "string"
-            },
-            {
-              "name": "caseType",
-              "value": "={{ $json.body.caseType || $json.caseType || '' }}",
-              "type": "string"
-            }
-          ]
-        }
-      }
-    },
-    {
-      "id": "logOfficeQueue",
-      "name": "Log office review queue",
-      "type": "n8n-nodes-base.airtable",
-      "typeVersion": 2,
-      "position": [780, 280],
-      "parameters": {
-        "operation": "create",
-        "base": {
-          "mode": "id",
-          "value": "={{ $env.AIRTABLE_BASE_ID }}"
-        },
-        "table": {
-          "mode": "name",
-          "value": "Activity log"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": "={{ { 'Case link': $json.caseId, Actor: 'office-automation', 'Event type': 'office_review_queued', Summary: 'Native intake queued for office review', 'Source system': 'n8n', Timestamp: new Date().toISOString() } }}"
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "={{ $env.AIRTABLE_CASES_TABLE }}",
+        "options": {
+          "watchFor": "recordUpdated"
         }
       },
       "credentials": {
@@ -80,30 +22,101 @@
       }
     },
     {
-      "id": "returnQueued",
-      "name": "Return success",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [1040, 280],
+      "id": "filterIntakeSubmitted",
+      "name": "Intake submitted + pending approval?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [500, 280],
       "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ { ok: true, queued: true } }}"
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.fields['Current stage'] || '' }}",
+              "operation": "equal",
+              "value2": "intake-submitted"
+            },
+            {
+              "value1": "={{ $json.fields['Client portal status'] || '' }}",
+              "operation": "equal",
+              "value2": "pending-office-approval"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "logOfficeQueue",
+      "name": "Log office review queue",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [780, 220],
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "mode": "id",
+          "value": "={{ $env.AIRTABLE_BASE_ID }}"
+        },
+        "table": {
+          "mode": "name",
+          "value": "={{ $env.AIRTABLE_ACTIVITY_LOG_TABLE }}"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": "={{ { 'Case link': $json.fields['Case ID'] || '', Actor: 'office-automation', 'Event type': 'office_review_queued', Summary: `Native intake queued for office review: ${$json.fields['Lead name'] || 'Unknown lead'}`, 'Source system': 'n8n', Timestamp: new Date().toISOString() } }}"
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "airtable-keypoint",
+          "name": "Airtable KeyPoint"
+        }
+      }
+    },
+    {
+      "id": "officeAlertConfigured",
+      "name": "Office alert configured?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1040, 220],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $env.OFFICE_ALERT_WEBHOOK_URL || '' }}",
+              "operation": "notEmpty"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sendOfficeAlert",
+      "name": "Send office alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 160],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { channel: 'whatsapp', caseId: $item(0).$node['Intake submitted trigger'].json.fields['Case ID'] || '', leadName: $item(0).$node['Intake submitted trigger'].json.fields['Lead name'] || '', phone: $item(0).$node['Intake submitted trigger'].json.fields['Phone'] || '', message: 'Native intake submitted and queued for office review' } }}"
       }
     }
   ],
   "connections": {
-    "Native intake created webhook": {
+    "Intake submitted trigger": {
       "main": [
         [
           {
-            "node": "Normalize native intake event",
+            "node": "Intake submitted + pending approval?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Normalize native intake event": {
+    "Intake submitted + pending approval?": {
       "main": [
         [
           {
@@ -111,18 +124,31 @@
             "type": "main",
             "index": 0
           }
-        ]
+        ],
+        []
       ]
     },
     "Log office review queue": {
       "main": [
         [
           {
-            "node": "Return success",
+            "node": "Office alert configured?",
             "type": "main",
             "index": 0
           }
         ]
+      ]
+    },
+    "Office alert configured?": {
+      "main": [
+        [
+          {
+            "node": "Send office alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
       ]
     }
   },

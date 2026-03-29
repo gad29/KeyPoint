@@ -3,7 +3,6 @@ import { listCases, createCase } from '@/lib/repository';
 import { hasAirtableConfig } from '@/lib/env';
 import { createNativeIntakeCase } from '@/lib/airtable';
 import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
-import { triggerN8n } from '@/lib/n8n';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -79,26 +78,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    const automationPayload = {
-      caseId: result.data.id,
-      submissionId,
-      leadName: result.data.leadName,
-      phone: result.data.phone,
-      email: result.data.email || '',
-      caseType: result.data.caseType,
-      borrowerProfiles: result.data.borrowerProfiles,
-      intakeSummary: summarizeIntakeForNotes(intake),
-    };
-
-    let automation = await triggerN8n('keypoint/native-intake-created', automationPayload);
-
-    if (!automation.ok) {
-      automation = await triggerN8n(
-        'wzoDgkAFrA4iDfZO/native%2520intake%2520created%2520webhook/keypoint/native-intake-created',
-        automationPayload,
-      );
-    }
-
     return NextResponse.json(
       {
         ok: true,
@@ -108,8 +87,12 @@ export async function POST(req: NextRequest) {
           submissionId,
           seededDocuments: result.meta?.requiredDocumentCodes || [],
           clientsCreated: result.meta?.clientsCreated || 0,
-          automationTriggered: automation.ok,
-          automation,
+          automationTriggered: false,
+          automation: {
+            ok: false,
+            skipped: true,
+            reason: 'post-create automation is being rebuilt around Airtable-triggered workflows',
+          },
         },
       },
       { status: 201 },

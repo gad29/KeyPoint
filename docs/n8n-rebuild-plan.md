@@ -23,7 +23,7 @@ Build only these three workflows first.
 
 ### Workflow A — Native intake kickoff
 Trigger:
-- app webhook after successful native intake creation
+- Airtable case update / new intake state detected after successful native intake creation
 
 Purpose:
 - create an office-facing automation event
@@ -82,9 +82,9 @@ Only build these after A/B/C are stable:
 ## Rebuild sequence
 1. Archive the current experimental native-intake workflow in live n8n.
 2. Remove app fallback hacks added only for the broken live webhook experiment.
-3. Create a new minimal native-intake kickoff workflow with one clean webhook path.
+3. Create a new minimal native-intake kickoff workflow using Airtable-triggered state changes, not app-triggered n8n webhooks.
 4. Import and activate it normally.
-5. Validate one live intake returns `automationTriggered: true`.
+5. Validate one live intake leads to the expected office-queue activity.
 6. Rebuild document upload review queue.
 7. Rebuild office approval -> portal invite.
 8. Only then expand into the remaining workflows.
@@ -98,8 +98,8 @@ A rebuild is only considered done when:
 - office approval triggers invite generation and logging
 - no workflow duplicates core app-owned Airtable writes
 
-## Current live status snapshot
-At time of writing:
-- `[ARCHIVED] KeyPoint | Fillout intake -> Airtable case creation` exists but is inactive
-- `KeyPoint | Native intake post-create kickoff` is active but considered experimental and should be replaced cleanly
-- all other KeyPoint workflows are inactive
+## Current repo status snapshot
+At time of writing in the repo:
+- the app-side native intake webhook fallback hack has been removed in favor of Airtable-triggered post-create automation
+- workflow `01-native-intake-post-create.json` now models an Airtable-triggered office-queue kickoff instead of an app-triggered webhook
+- live n8n still needs a manual cleanup pass so the imported/active workflows match the repo state
