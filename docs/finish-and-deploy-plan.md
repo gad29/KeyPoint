@@ -11,10 +11,11 @@ This is the execution tracker for getting KeyPoint from working internal MVP to 
 ## Must finish before calling it deploy-ready
 
 ### A. Production app rollout
-- [ ] Confirm Vercel project exists and is linked to this app
-- [ ] Push `generated/vercel.env` into Vercel
-- [ ] Confirm `keypoint.work` and `www.keypoint.work` are attached to the Vercel project
-- [ ] Confirm DNS points correctly
+- [ ] Confirm the intended production host: Vercel or a specific VPS/reverse-proxy box
+- [ ] Resolve the current domain mismatch: `keypoint.work` publicly resolves to `212.47.64.204`, while the KeyPoint workspace/n8n work here lives on `72.61.195.165`
+- [ ] If Vercel is intended, point DNS to Vercel and attach `keypoint.work` + `www.keypoint.work`
+- [ ] If a VPS is intended, deploy the app on that exact VPS and verify its nginx/app service chain
+- [ ] Push the correct production env set into the actual production target
 - [ ] Run a live smoke test on the production URL
 
 ### B. Native intake -> office queue path

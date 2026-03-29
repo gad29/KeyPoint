@@ -6,6 +6,7 @@
 - Portal invite links are signed/stateless
 - Uploads still default to local disk unless you connect a storage path
 - Single settings file can generate app + n8n env files
+- Important deployment blocker: the public domain `keypoint.work` currently resolves to `212.47.64.204`, while the active workspace/app work here is on `72.61.195.165`, so public deployment verification must happen on the actual target host
 
 ## Fastest deployment flow
 1. Copy `keypoint.settings.example.json` to `keypoint.settings.json`
