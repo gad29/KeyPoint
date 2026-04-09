@@ -1,3 +1,5 @@
+const port = Number(process.env.PORT) || 3000;
+
 module.exports = {
   apps: [
     {
@@ -7,7 +9,7 @@ module.exports = {
       args: 'run start',
       env: {
         NODE_ENV: 'production',
-        PORT: 3000,
+        PORT: port,
         HOSTNAME: '0.0.0.0',
       },
       max_restarts: 10,
