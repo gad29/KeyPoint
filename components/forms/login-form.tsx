@@ -3,9 +3,44 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export function LoginForm() {
+type LoginFormProps = {
+  officeAuthEnabled: boolean;
+  nextPath?: string;
+};
+
+export function LoginForm({ officeAuthEnabled, nextPath = '/office' }: LoginFormProps) {
   const [token, setToken] = useState('');
+  const [officeCode, setOfficeCode] = useState('');
+  const [officeError, setOfficeError] = useState('');
+  const [submittingOffice, setSubmittingOffice] = useState(false);
   const router = useRouter();
+
+  async function submitOfficeLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setOfficeError('');
+
+    if (!officeAuthEnabled) {
+      router.push(nextPath as never);
+      return;
+    }
+
+    setSubmittingOffice(true);
+    const res = await fetch('/api/office/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: officeCode }),
+    });
+    const json = await res.json().catch(() => ({ ok: false, error: 'Login failed' }));
+    setSubmittingOffice(false);
+
+    if (json.ok) {
+      router.push(nextPath as never);
+      router.refresh();
+      return;
+    }
+
+    setOfficeError(json.error || 'Login failed');
+  }
 
   return (
     <div className="grid">
@@ -19,12 +54,25 @@ export function LoginForm() {
         <button className="button" type="submit">Continue</button>
       </form>
 
-      <section className="card">
+      <form className="card" onSubmit={submitOfficeLogin}>
         <p className="eyebrow">Office</p>
         <h2>Office workspace</h2>
-        <p className="muted">Open the internal case workspace for secretary and advisor actions.</p>
-        <a className="button button-secondary" href="/office">Enter office</a>
-      </section>
+        <p className="muted">
+          {officeAuthEnabled
+            ? 'Enter the internal office access code to open the secretary and advisor workspace.'
+            : 'Office auth is not configured yet on this environment. Continuing will open the internal workspace directly.'}
+        </p>
+        {officeAuthEnabled ? (
+          <label className="field">
+            <span>Office access code</span>
+            <input type="password" value={officeCode} onChange={(e) => setOfficeCode(e.target.value)} placeholder="Enter office code" />
+          </label>
+        ) : null}
+        <button className="button button-secondary" type="submit" disabled={submittingOffice}>
+          {submittingOffice ? 'Checking…' : 'Enter office'}
+        </button>
+        {officeError ? <p className="muted" style={{ color: '#b42318' }}>{officeError}</p> : null}
+      </form>
     </div>
   );
 }

@@ -13,7 +13,6 @@ import {
   listAirtableBankRuns,
   listAirtableCases,
   updateAirtableCase,
-  updateAirtableCaseStage,
   updateAirtablePortalStatus,
 } from '@/lib/airtable';
 import { postJson, triggerN8n } from '@/lib/n8n';
@@ -22,6 +21,12 @@ import type { CaseUpdateInput, CreateBankOfferInput, CreateCaseInput, PortalInvi
 const appRoot = process.cwd();
 const dataRoot = path.join(appRoot, 'data');
 const uploadsFile = path.join(dataRoot, 'uploads.json');
+
+function logRepository(level: 'info' | 'warn' | 'error', message: string, details?: Record<string, unknown>) {
+  const payload = details ? ` ${JSON.stringify(details)}` : '';
+  const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info;
+  logger(`[KeyPoint Repository] ${message}${payload}`);
+}
 
 function ensureJsonFile(filePath: string, defaultValue: unknown) {
   if (!fs.existsSync(filePath)) {
@@ -157,7 +162,10 @@ async function triggerStageReview(caseRecord: CaseRecord) {
   const payloadRef = `stage-review:${caseRecord.id}:${Date.now()}`;
 
   if (hasAirtableConfig()) {
-    await createAirtableAiReviewStub(caseRecord.id, caseRecord.stage, payloadRef);
+    const stub = await createAirtableAiReviewStub(caseRecord.id, caseRecord.stage, payloadRef);
+    if (!stub.ok) {
+      logRepository('warn', 'AI review stub could not be created', { caseId: caseRecord.id, error: stub.error });
+    }
   }
 
   if (env.aiReviewWebhookUrl) {
@@ -171,21 +179,32 @@ async function triggerStageReview(caseRecord: CaseRecord) {
   return { ok: false, error: 'No AI review hook configured' } as const;
 }
 
+async function safeActivityLog(caseId: string, eventType: string, summary: string, actor?: string) {
+  const result = await createAirtableActivityLog(caseId, eventType, summary, actor);
+  if (!result.ok) {
+    logRepository('warn', 'Activity log write failed', { caseId, eventType, error: result.error });
+  }
+  return result;
+}
+
 export async function listCases(): Promise<CaseRecord[]> {
   if (!hasAirtableConfig()) return sampleCases;
 
   const airtable = await listAirtableCases();
-  if (airtable.ok && airtable.data?.length) {
+  if (airtable.ok && airtable.data) {
     return airtable.data;
   }
 
-  return sampleCases;
+  logRepository('warn', 'Falling back to empty live case list because Airtable listing failed', { error: airtable.error });
+  return [];
 }
 
 export async function getCase(caseId: string): Promise<CaseRecord | undefined> {
   if (hasAirtableConfig()) {
     const airtable = await getAirtableCaseByCaseId(caseId);
     if (airtable.ok && airtable.data) return airtable.data;
+    logRepository('warn', 'Live case lookup failed', { caseId, error: airtable.error });
+    return undefined;
   }
 
   return sampleCases.find((item) => item.id === caseId);
@@ -199,13 +218,21 @@ export async function createCase(input: CreateCaseInput) {
   const created = await createAirtableCase(input);
   if (!created.ok || !created.data) return created;
 
-  await createAirtableActivityLog(created.data.id, 'case-created', 'Case created from KeyPoint app');
-  await triggerOfficeAlert('secretary-alert', {
+  await safeActivityLog(created.data.id, 'case-created', 'Case created from KeyPoint app');
+  const alertResult = await triggerOfficeAlert('secretary-alert', {
     caseId: created.data.id,
     leadName: created.data.leadName,
     stage: created.data.stage,
     assignedTo: created.data.assignedTo,
   });
+
+  if (!alertResult.ok) {
+    logRepository('warn', 'Secretary alert trigger failed after case creation', {
+      caseId: created.data.id,
+      error: alertResult.error,
+    });
+  }
+
   return created;
 }
 
@@ -226,16 +253,23 @@ export async function updateCase(caseId: string, input: CaseUpdateInput) {
   ].filter(Boolean);
 
   if (activityParts.length) {
-    await createAirtableActivityLog(caseId, 'case-updated', `Updated ${activityParts.join(', ')}`);
+    await safeActivityLog(caseId, 'case-updated', `Updated ${activityParts.join(', ')}`);
   }
 
   if (input.notesAppend?.trim()) {
-    await createAirtableActivityLog(caseId, 'case-note-added', input.notesAppend.trim());
+    await safeActivityLog(caseId, 'case-note-added', input.notesAppend.trim());
   }
 
   if (input.stage) {
-    await triggerStageReview(updated.data);
-    await triggerAdvisorReady(updated.data);
+    const reviewResult = await triggerStageReview(updated.data);
+    if (!reviewResult.ok) {
+      logRepository('warn', 'Stage review trigger failed', { caseId, stage: input.stage, error: reviewResult.error });
+    }
+
+    const advisorResult = await triggerAdvisorReady(updated.data);
+    if (!advisorResult.ok) {
+      logRepository('warn', 'Advisor-ready trigger failed', { caseId, stage: input.stage, error: advisorResult.error });
+    }
   }
 
   return updated;
@@ -266,8 +300,11 @@ export async function createInvite(caseId: string): Promise<PortalInvite> {
   if (!parsed) throw new Error('Failed to create invite token');
 
   if (hasAirtableConfig()) {
-    await updateAirtablePortalStatus(caseId, 'invited');
-    await createAirtableActivityLog(caseId, 'portal-invite-generated', 'Client progress link generated');
+    const portalStatusResult = await updateAirtablePortalStatus(caseId, 'invited');
+    if (!portalStatusResult.ok) {
+      logRepository('warn', 'Portal status update failed after invite generation', { caseId, error: portalStatusResult.error });
+    }
+    await safeActivityLog(caseId, 'portal-invite-generated', 'Client progress link generated');
   }
 
   return { token, ...parsed };
@@ -303,13 +340,21 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
   let caseDocumentRecordId = '';
   if (hasAirtableConfig()) {
     const createdDocument = await createAirtableCaseDocument(record.caseId, record.documentCode, record.path);
-    caseDocumentRecordId = createdDocument.ok && createdDocument.data?.id ? createdDocument.data.id : '';
-    await createAirtableActivityLog(record.caseId, 'document-uploaded', `${record.fileName} uploaded for ${record.documentCode}`);
+    if (createdDocument.ok && createdDocument.data?.id) {
+      caseDocumentRecordId = createdDocument.data.id;
+    } else {
+      logRepository('warn', 'Upload saved locally but Airtable case-document row failed', {
+        caseId: record.caseId,
+        documentCode: record.documentCode,
+        error: createdDocument.error,
+      });
+    }
+    await safeActivityLog(record.caseId, 'document-uploaded', `${record.fileName} uploaded for ${record.documentCode}`);
   }
 
   if (env.n8nWebhookBaseUrl) {
     const caseRecord = await getCase(record.caseId);
-    await triggerN8n('keypoint/document-upload', {
+    const automationResult = await triggerN8n('keypoint/document-upload', {
       caseDocumentRecordId,
       caseId: record.caseId,
       documentCode: record.documentCode,
@@ -319,6 +364,14 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
       path: record.path,
       phone: caseRecord?.phone || '',
     });
+
+    if (!automationResult.ok) {
+      logRepository('warn', 'Document upload automation trigger failed', {
+        caseId: record.caseId,
+        documentCode: record.documentCode,
+        error: automationResult.error,
+      });
+    }
   }
 
   return record;
@@ -333,6 +386,8 @@ export async function listBankOffers(caseId: string): Promise<BankOffer[]> {
   if (hasAirtableConfig()) {
     const result = await listAirtableBankRuns(caseId);
     if (result.ok && result.data) return result.data;
+    logRepository('warn', 'Live bank-offer lookup failed; returning empty list', { caseId, error: result.error });
+    return [];
   }
 
   return sampleOffers;
@@ -346,11 +401,18 @@ export async function createBankOffer(input: CreateBankOfferInput) {
   const created = await createAirtableBankRun(input);
   if (!created.ok) return created;
 
-  await createAirtableActivityLog(input.caseId, 'bank-offer-added', `Added ${input.bank} offer (${input.status})`);
+  await safeActivityLog(input.caseId, 'bank-offer-added', `Added ${input.bank} offer (${input.status})`);
 
   const caseRecord = await getCase(input.caseId);
   if (caseRecord) {
-    await triggerStageReview(caseRecord);
+    const reviewResult = await triggerStageReview(caseRecord);
+    if (!reviewResult.ok) {
+      logRepository('warn', 'Stage review trigger failed after bank offer creation', {
+        caseId: input.caseId,
+        bank: input.bank,
+        error: reviewResult.error,
+      });
+    }
   }
 
   return { ok: true, data: input } as const;

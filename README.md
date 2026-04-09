@@ -41,7 +41,8 @@ npm run dev
 - Put the values from `generated/vercel.env` into Vercel project env vars, or paste them directly from that file.
 - Put the values from `n8n/.env.generated` into your n8n environment.
 - Import the workflows from `n8n/workflows/`.
-- Confirm Airtable field names match `docs/airtable-schema.md`.
+- Set `OFFICE_ACCESS_CODE` in production before exposing `/office` publicly.
+- The app is now schema-aware against the live Airtable base, but keeping the field labels aligned with `docs/airtable-schema.md` is still the cleanest path.
 
 ### Self-hosted VPS / CloudPanel
 - Copy `.env.production.example` to `.env.production.local`, or generate it via `npm run apply-settings`.
@@ -82,7 +83,7 @@ npm run dev
 ## Remaining real-world caveats
 - Upload persistence is still local by default unless you connect a storage provider path.
 - n8n provider credentials themselves may still require manual entry in n8n depending on the service.
-- Real auth is still lightweight; portal access is invite-based.
+- Office access can now be protected with an internal `OFFICE_ACCESS_CODE`; portal access remains invite-based.
 
 ## Important docs
 - `docs/integration-checklist.md`

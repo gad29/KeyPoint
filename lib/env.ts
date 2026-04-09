@@ -11,6 +11,9 @@ export const env = {
   appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
   keypointAppBaseUrl: process.env.KEYPOINT_APP_BASE_URL || process.env.APP_BASE_URL || 'http://localhost:3000',
   portalInviteSecret: process.env.PORTAL_INVITE_SECRET || 'change-me',
+  officeAccessCode: process.env.OFFICE_ACCESS_CODE,
+  officeSessionSecret: process.env.OFFICE_SESSION_SECRET,
+  officeSessionHours: process.env.OFFICE_SESSION_HOURS || '12',
   uploadDir: process.env.UPLOAD_DIR || './data/uploads',
   uploadPublicBaseUrl: process.env.UPLOAD_PUBLIC_BASE_URL,
   officeAlertWebhookUrl: process.env.OFFICE_ALERT_WEBHOOK_URL,
@@ -40,6 +43,10 @@ export function hasLiveAppBaseUrl() {
   return Boolean(env.appBaseUrl && !env.appBaseUrl.includes('localhost'));
 }
 
+export function isProductionLike() {
+  return process.env.NODE_ENV === 'production' || hasLiveAppBaseUrl();
+}
+
 export function looksLikePlaceholder(value?: string | null) {
   if (!value) return true;
   return value.includes('example.com') || value.includes('change-me') || value.includes('replace-with-');
@@ -51,6 +58,10 @@ export function hasN8nConfig() {
 
 export function hasPortalInviteSecret() {
   return Boolean(env.portalInviteSecret && !looksLikePlaceholder(env.portalInviteSecret));
+}
+
+export function hasOfficeAuthConfig() {
+  return Boolean(env.officeAccessCode && !looksLikePlaceholder(env.officeAccessCode));
 }
 
 export function hasOfficeAlertsConfig() {

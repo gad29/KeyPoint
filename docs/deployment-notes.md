@@ -25,6 +25,8 @@ These are now generated automatically from the settings file:
 - `APP_BASE_URL`
 - `KEYPOINT_APP_BASE_URL`
 - `PORTAL_INVITE_SECRET`
+- `OFFICE_ACCESS_CODE`
+- `OFFICE_SESSION_SECRET` (optional, recommended when multiple environments share the same invite secret)
 - `AIRTABLE_API_KEY`
 - `AIRTABLE_BASE_ID`
 - `AIRTABLE_CASES_TABLE`
@@ -78,4 +80,4 @@ In Vercel:
 - Vercel local disk is not durable storage; use a proper storage path if uploads matter in production
 - A VPS with local disk is better for the current upload model, but uploads are still only as durable as that server unless you add backups/object storage
 - Some third-party services still require manual credential entry or OAuth consent on their own platform
-- Real auth beyond invite-token access is still a future hardening item
+- Office auth is now a pragmatic shared-code gate; if the business grows, replace it with proper staff accounts / SSO

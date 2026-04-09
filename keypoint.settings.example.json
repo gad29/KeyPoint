@@ -1,7 +1,10 @@
 {
   "app": {
     "baseUrl": "https://keypoint.work",
-    "portalInviteSecret": "replace-with-a-long-random-secret"
+    "portalInviteSecret": "replace-with-a-long-random-secret",
+    "officeAccessCode": "",
+    "officeSessionSecret": "",
+    "officeSessionHours": 12
   },
   "airtable": {
     "apiKey": "",

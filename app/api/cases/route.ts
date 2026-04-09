@@ -94,7 +94,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: 400 });
     }
 
-    await notifyNewIntake(result.data.id, result.data.leadName, result.data.phone);
+    const alertResult = await notifyNewIntake(result.data.id, result.data.leadName, result.data.phone);
+    if (!alertResult.ok) {
+      console.warn(
+        `[KeyPoint API] Intake created but office alert failed ${JSON.stringify({ caseId: result.data.id, error: alertResult.error })}`,
+      );
+    }
 
     return NextResponse.json(
       {
@@ -105,6 +110,7 @@ export async function POST(req: NextRequest) {
           submissionId,
           seededDocuments: result.meta?.requiredDocumentCodes || [],
           clientsCreated: result.meta?.clientsCreated || 0,
+          warnings: result.meta?.warnings || [],
           automationTriggered: Boolean(env.officeAlertWebhookUrl || env.n8nWebhookBaseUrl),
         },
       },

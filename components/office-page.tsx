@@ -83,6 +83,7 @@ const copy = {
     noCases: 'No cases available.',
     phase: 'Workflow phase',
     offers: 'Offers',
+    signOut: 'Sign out',
     statusSaved: 'Saved.',
     intakePhase: 'Intake complete',
     appraisalPhase: 'Appraisal / property docs',
@@ -115,6 +116,7 @@ const copy = {
     noCases: 'אין כרגע תיקים להצגה.',
     phase: 'שלב בתהליך',
     offers: 'הצעות',
+    signOut: 'התנתקות',
     statusSaved: 'נשמר.',
     intakePhase: 'השלמת פתיחה',
     appraisalPhase: 'שמאות / מסמכי נכס',
@@ -133,6 +135,11 @@ export function OfficePageClient({ cases, offersByCase, liveMode }: OfficePageCl
   const { language } = useI18n();
   const t = copy[language];
   const labels = stageLabels[language];
+
+  async function signOut() {
+    await fetch('/api/office/logout', { method: 'POST' });
+    window.location.href = '/login';
+  }
   const [selectedCaseId, setSelectedCaseId] = useState(cases[0]?.id || '');
   const [localCases, setLocalCases] = useState(cases);
   const [localOffers, setLocalOffers] = useState(offersByCase);
@@ -209,7 +216,10 @@ export function OfficePageClient({ cases, offersByCase, liveMode }: OfficePageCl
           <h2>{t.title}</h2>
           <p className="muted">{t.body}</p>
         </div>
-        <span className={`badge ${liveMode ? 'good' : 'warn'}`}>{liveMode ? t.live : t.local}</span>
+        <div className="inline-actions">
+          <span className={`badge ${liveMode ? 'good' : 'warn'}`}>{liveMode ? t.live : t.local}</span>
+          <button className="button button-secondary" type="button" onClick={signOut}>{t.signOut}</button>
+        </div>
       </section>
 
       <div className="grid cols-2 office-grid">

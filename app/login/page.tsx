@@ -1,9 +1,13 @@
 import { LoginForm } from '@/components/forms/login-form';
+import { hasOfficeAuthConfig } from '@/lib/env';
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+  const params = await searchParams;
+  const nextPath = typeof params.next === 'string' && params.next.startsWith('/') ? params.next : '/office';
+
   return (
     <div className="grid" style={{ maxWidth: 560 }}>
-      <LoginForm />
+      <LoginForm officeAuthEnabled={hasOfficeAuthConfig()} nextPath={nextPath} />
     </div>
   );
 }

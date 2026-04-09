@@ -4,6 +4,7 @@ import type { ActionResult, CaseUpdateInput, CreateBankOfferInput, CreateCaseInp
 import { getRequiredDocumentCodes, type IntakePayload } from '@/lib/intake';
 
 const apiBase = 'https://api.airtable.com/v0';
+const metaApiBase = 'https://api.airtable.com/v0/meta/bases';
 
 type AirtableRecord<T = Record<string, unknown>> = {
   id: string;
@@ -16,6 +17,14 @@ type AirtableListResponse<T = Record<string, unknown>> = {
   offset?: string;
 };
 
+type AirtableMetaResponse = {
+  tables: Array<{
+    id: string;
+    name: string;
+    fields: Array<{ id: string; name: string; type: string }>;
+  }>;
+};
+
 type AirtableCaseFields = Record<string, unknown>;
 type AirtableBankRunFields = Record<string, unknown>;
 
@@ -24,6 +33,95 @@ type AirtableCaseEntity = {
   case: CaseRecord;
 };
 
+type TableSchema = {
+  name: string;
+  fields: string[];
+  fieldLookup: Map<string, string>;
+};
+
+type SemanticFieldMap = Record<string, string[]>;
+
+type WriteFieldsResult = {
+  fields: Record<string, unknown>;
+  missing: string[];
+};
+
+const schemaCache = new Map<string, Promise<TableSchema | null>>();
+
+const caseFieldAliases = {
+  caseId: ['Case ID', 'Case Id', 'case_id', 'caseid'],
+  leadName: ['Lead name', 'Lead Name', 'Client name', 'Client Name', 'Name'],
+  spouseName: ['Spouse name', 'Spouse Name'],
+  phone: ['Phone', 'Phone number', 'WhatsApp number', 'Mobile'],
+  email: ['Email', 'E-mail'],
+  caseType: ['Case type', 'Case Type'],
+  borrowerProfiles: ['Borrower profiles', 'Borrower Profiles', 'Borrower profile'],
+  currentStage: ['Current stage', 'Current Stage', 'Stage'],
+  assignedStaff: ['Assigned staff', 'Assigned Staff', 'Owner', 'Assignee'],
+  missingItemsCount: ['Missing items count', 'Missing Items Count', 'Missing documents count'],
+  clientPortalStatus: ['Client portal status', 'Portal status', 'Client Portal Status'],
+  filloutSubmissionId: ['Fillout submission id', 'Submission ID', 'Submission Id'],
+  nextAction: ['Next action', 'Next Action'],
+  notes: ['Notes', 'Internal notes', 'Internal Notes'],
+  bankTargets: ['Bank targets', 'Target banks', 'Preferred banks'],
+} satisfies SemanticFieldMap;
+
+const bankRunFieldAliases = {
+  caseLink: ['Case link', 'Case Link', 'Case ID', 'Case Id'],
+  bankName: ['Bank name', 'Bank Name', 'Bank'],
+  requestedAt: ['Requested at', 'Requested At'],
+  status: ['Status'],
+  firstPayment: ['First payment', 'First Payment'],
+  maxPayment: ['Max payment', 'Max Payment'],
+  totalRepayment: ['Total repayment', 'Total Repayment'],
+  totalInterest: ['Total interest', 'Total Interest'],
+  expiryDate: ['Expiry date', 'Expiration date', 'Expires at'],
+  conditions: ['Conditions / comments', 'Conditions', 'Comments'],
+} satisfies SemanticFieldMap;
+
+const activityLogFieldAliases = {
+  caseLink: ['Case link', 'Case Link', 'Case ID'],
+  actor: ['Actor'],
+  eventType: ['Event type', 'Event Type'],
+  summary: ['Summary'],
+  sourceSystem: ['Source system', 'Source System'],
+  timestamp: ['Timestamp', 'Created at'],
+} satisfies SemanticFieldMap;
+
+const documentFieldAliases = {
+  caseLink: ['Case link', 'Case Link', 'Case ID'],
+  documentCode: ['Document code', 'Document Code'],
+  required: ['Required?', 'Required'],
+  status: ['Status'],
+  uploadedFileUrl: ['Uploaded file URL', 'Uploaded File URL', 'File URL'],
+  ocrSummary: ['OCR summary', 'OCR Summary'],
+  reviewNotes: ['Review notes', 'Review Notes'],
+  requestedResubmissionAt: ['Requested resubmission at'],
+  approvedAt: ['Approved at'],
+} satisfies SemanticFieldMap;
+
+const clientFieldAliases = {
+  caseLink: ['Case link', 'Case Link', 'Case ID'],
+  fullName: ['Full name', 'Full Name', 'Name'],
+  idNumber: ['ID number', 'ID Number'],
+  preferredLanguage: ['Preferred language', 'Preferred Language'],
+  whatsappNumber: ['WhatsApp number', 'Phone', 'WhatsApp'],
+  email: ['Email'],
+} satisfies SemanticFieldMap;
+
+const aiReviewFieldAliases = {
+  caseLink: ['Case link', 'Case Link', 'Case ID'],
+  triggeredBy: ['Triggered by', 'Triggered By'],
+  anonymizedPayloadRef: ['Anonymized payload ref', 'Payload ref'],
+  reviewStatus: ['Review status', 'Review Status', 'Status'],
+} satisfies SemanticFieldMap;
+
+function logAirtable(level: 'info' | 'warn' | 'error', message: string, details?: Record<string, unknown>) {
+  const payload = details ? ` ${JSON.stringify(details)}` : '';
+  const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info;
+  logger(`[KeyPoint Airtable] ${message}${payload}`);
+}
+
 function isString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
@@ -31,6 +129,7 @@ function isString(value: unknown): value is string {
 function asString(value: unknown, fallback = ''): string {
   if (typeof value === 'string') return value;
   if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) return value.map((item) => asString(item)).filter(Boolean).join(', ');
   return fallback;
 }
 
@@ -44,10 +143,24 @@ function asNumber(value: unknown, fallback = 0): number {
 }
 
 function asStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string');
-  if (typeof value === 'string' && value.trim()) {
-    return value.split(',').map((item) => item.trim()).filter(Boolean);
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((item) => {
+        if (typeof item === 'string') return [item];
+        if (typeof item === 'number') return [String(item)];
+        return [];
+      })
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
+
+  if (typeof value === 'string' && value.trim()) {
+    return value
+      .split(/[\n,;]+/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
   return [];
 }
 
@@ -105,6 +218,129 @@ function normalizeBankOfferStatus(value: unknown): BankOffer['status'] {
   return allowed.includes(raw) ? raw : 'requested';
 }
 
+function normalizeFieldKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function createFallbackSchema(name: string, aliases: SemanticFieldMap): TableSchema {
+  const fields = Object.values(aliases).map((item) => item[0]);
+  return {
+    name,
+    fields,
+    fieldLookup: new Map(fields.map((field) => [normalizeFieldKey(field), field])),
+  };
+}
+
+async function fetchTableSchema(table: string): Promise<TableSchema | null> {
+  if (!hasAirtableConfig()) return null;
+
+  try {
+    const response = await fetch(`${metaApiBase}/${env.airtableBaseId}/tables`, {
+      headers: {
+        Authorization: `Bearer ${env.airtableApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!response.ok) {
+      logAirtable('warn', 'Failed to fetch Airtable schema metadata', { table, status: response.status });
+      return null;
+    }
+
+    const payload = (await response.json()) as AirtableMetaResponse;
+    const matchedTable = payload.tables.find((item) => item.name === table);
+
+    if (!matchedTable) {
+      logAirtable('warn', 'Airtable schema metadata missing table', { table });
+      return null;
+    }
+
+    return {
+      name: matchedTable.name,
+      fields: matchedTable.fields.map((field) => field.name),
+      fieldLookup: new Map(matchedTable.fields.map((field) => [normalizeFieldKey(field.name), field.name])),
+    };
+  } catch (error) {
+    logAirtable('warn', 'Airtable schema fetch failed', {
+      table,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+async function getTableSchema(table: string, aliases: SemanticFieldMap): Promise<TableSchema> {
+  if (!schemaCache.has(table)) {
+    schemaCache.set(table, fetchTableSchema(table));
+  }
+
+  const schema = await schemaCache.get(table);
+  return schema ?? createFallbackSchema(table, aliases);
+}
+
+function resolveFieldName(schema: TableSchema, aliases: string[]) {
+  for (const alias of aliases) {
+    const matched = schema.fieldLookup.get(normalizeFieldKey(alias));
+    if (matched) return matched;
+  }
+  return undefined;
+}
+
+function pickFieldValue(fields: Record<string, unknown>, schema: TableSchema, aliases: string[]) {
+  for (const alias of aliases) {
+    const matched = schema.fieldLookup.get(normalizeFieldKey(alias)) ?? alias;
+    if (matched in fields) return fields[matched];
+  }
+
+  const fallbackEntry = Object.entries(fields).find(([key]) => aliases.some((alias) => normalizeFieldKey(alias) === normalizeFieldKey(key)));
+  return fallbackEntry?.[1];
+}
+
+function buildWriteFields(
+  schema: TableSchema,
+  aliases: SemanticFieldMap,
+  values: Record<string, unknown>,
+  options?: { required?: string[]; table?: string },
+): WriteFieldsResult {
+  const fields: Record<string, unknown> = {};
+  const missing: string[] = [];
+
+  for (const [semanticKey, value] of Object.entries(values)) {
+    if (value === undefined) continue;
+
+    const aliasList = aliases[semanticKey];
+    if (!aliasList?.length) continue;
+
+    const fieldName = resolveFieldName(schema, aliasList);
+    if (!fieldName) {
+      missing.push(semanticKey);
+      continue;
+    }
+
+    fields[fieldName] = value;
+  }
+
+  if (missing.length && options?.table) {
+    logAirtable('warn', 'Skipping Airtable fields that are not present in schema', {
+      table: options.table,
+      missing,
+      availableFields: schema.fields,
+    });
+  }
+
+  const requiredMissing = options?.required?.filter((key) => !(key in fields)) ?? [];
+  if (requiredMissing.length && options?.table) {
+    logAirtable('error', 'Airtable table is missing required fields for operation', {
+      table: options.table,
+      requiredMissing,
+      availableFields: schema.fields,
+    });
+  }
+
+  return { fields, missing: requiredMissing.length ? requiredMissing : missing };
+}
+
 async function airtableRequest<T = Record<string, unknown>>(
   tableOrPath: string,
   init?: RequestInit,
@@ -119,21 +355,54 @@ async function airtableRequest<T = Record<string, unknown>>(
     searchParams.forEach((value, key) => url.searchParams.set(key, value));
   }
 
-  const res = await fetch(url, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${env.airtableApiKey}`,
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
-    cache: 'no-store',
-  });
-
-  if (!res.ok) {
-    return { ok: false, error: `Airtable request failed with ${res.status}` };
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...init,
+      headers: {
+        Authorization: `Bearer ${env.airtableApiKey}`,
+        'Content-Type': 'application/json',
+        ...(init?.headers || {}),
+      },
+      cache: 'no-store',
+    });
+  } catch (error) {
+    logAirtable('error', 'Airtable network request failed', {
+      url: url.toString(),
+      method: init?.method || 'GET',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { ok: false, error: 'Airtable request failed before the server responded' };
   }
 
-  return { ok: true, data: (await res.json()) as T };
+  const responseText = await res.text();
+  const responseJson = responseText ? safeJsonParse(responseText) : undefined;
+
+  if (!res.ok) {
+    logAirtable('error', 'Airtable request returned an error response', {
+      url: url.toString(),
+      method: init?.method || 'GET',
+      status: res.status,
+      response: responseJson ?? responseText,
+    });
+
+    const airtableMessage =
+      responseJson && typeof responseJson === 'object' && responseJson && 'error' in responseJson
+        ? asString((responseJson as Record<string, unknown>).error)
+        : '';
+
+    return { ok: false, error: airtableMessage || `Airtable request failed with ${res.status}` };
+  }
+
+  return { ok: true, data: (responseJson as T | undefined) ?? ({} as T) };
+}
+
+function safeJsonParse(value: string) {
+  try {
+    return JSON.parse(value) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function listAirtableRecords<T = Record<string, unknown>>(
@@ -183,37 +452,59 @@ export async function findAirtableRecordByField<T = Record<string, unknown>>(tab
   return { ok: true, data: result.data[0] } as const;
 }
 
-function mapAirtableCase(record: AirtableRecord<AirtableCaseFields>): CaseRecord {
+async function findAirtableRecordByAliases<T = Record<string, unknown>>(
+  table: string,
+  schema: TableSchema,
+  aliases: string[],
+  value: string,
+) {
+  const fieldName = resolveFieldName(schema, aliases);
+  if (!fieldName) {
+    return { ok: false, error: `No matching field found in ${table}` } as const;
+  }
+
+  return findAirtableRecordByField<T>(table, fieldName, value);
+}
+
+async function mapAirtableCase(record: AirtableRecord<AirtableCaseFields>): Promise<CaseRecord> {
+  const schema = await getTableSchema(env.airtableCasesTable, caseFieldAliases);
   const fields = record.fields;
-  const caseId = asString(fields['Case ID'], record.id);
+  const caseId = asString(pickFieldValue(fields, schema, caseFieldAliases.caseId), record.id);
 
   return {
     id: caseId,
-    leadName: asString(fields['Lead name'], 'Unknown lead'),
-    spouseName: isString(fields['Spouse name']) ? fields['Spouse name'] : undefined,
-    phone: asString(fields['Phone']),
-    email: isString(fields['Email']) ? fields['Email'] : undefined,
-    stage: normalizeStage(fields['Current stage']),
-    caseType: normalizeCaseType(fields['Case type']),
-    borrowerProfiles: normalizeBorrowerProfiles(fields['Borrower profiles']),
-    missingItems: asNumber(fields['Missing items count']),
-    assignedTo: asString(fields['Assigned staff'], 'Unassigned'),
-    bankTargets: asStringArray(fields['Bank targets']),
-    nextAction: asString(fields['Next action'], 'Review case in office dashboard.'),
-    portalStatus: isString(fields['Client portal status']) ? fields['Client portal status'] : undefined,
+    leadName: asString(pickFieldValue(fields, schema, caseFieldAliases.leadName), 'Unknown lead'),
+    spouseName: isString(pickFieldValue(fields, schema, caseFieldAliases.spouseName))
+      ? asString(pickFieldValue(fields, schema, caseFieldAliases.spouseName))
+      : undefined,
+    phone: asString(pickFieldValue(fields, schema, caseFieldAliases.phone)),
+    email: isString(pickFieldValue(fields, schema, caseFieldAliases.email))
+      ? asString(pickFieldValue(fields, schema, caseFieldAliases.email))
+      : undefined,
+    stage: normalizeStage(pickFieldValue(fields, schema, caseFieldAliases.currentStage)),
+    caseType: normalizeCaseType(pickFieldValue(fields, schema, caseFieldAliases.caseType)),
+    borrowerProfiles: normalizeBorrowerProfiles(pickFieldValue(fields, schema, caseFieldAliases.borrowerProfiles)),
+    missingItems: asNumber(pickFieldValue(fields, schema, caseFieldAliases.missingItemsCount)),
+    assignedTo: asString(pickFieldValue(fields, schema, caseFieldAliases.assignedStaff), 'Unassigned'),
+    bankTargets: asStringArray(pickFieldValue(fields, schema, caseFieldAliases.bankTargets)),
+    nextAction: asString(pickFieldValue(fields, schema, caseFieldAliases.nextAction), 'Review case in office dashboard.'),
+    portalStatus: isString(pickFieldValue(fields, schema, caseFieldAliases.clientPortalStatus))
+      ? asString(pickFieldValue(fields, schema, caseFieldAliases.clientPortalStatus))
+      : undefined,
     airtableRecordId: record.id,
   };
 }
 
-function mapAirtableBankRun(record: AirtableRecord<AirtableBankRunFields>): BankOffer {
+async function mapAirtableBankRun(record: AirtableRecord<AirtableBankRunFields>): Promise<BankOffer> {
+  const schema = await getTableSchema(env.airtableBankRunsTable, bankRunFieldAliases);
   const fields = record.fields;
   return {
-    bank: asString(fields['Bank name'], 'Bank'),
-    status: normalizeBankOfferStatus(fields['Status']),
-    firstPayment: asString(fields['First payment']) || undefined,
-    maxPayment: asString(fields['Max payment']) || undefined,
-    totalRepayment: asString(fields['Total repayment']) || undefined,
-    expiresAt: asString(fields['Expiry date']) || undefined,
+    bank: asString(pickFieldValue(fields, schema, bankRunFieldAliases.bankName), 'Bank'),
+    status: normalizeBankOfferStatus(pickFieldValue(fields, schema, bankRunFieldAliases.status)),
+    firstPayment: asString(pickFieldValue(fields, schema, bankRunFieldAliases.firstPayment)) || undefined,
+    maxPayment: asString(pickFieldValue(fields, schema, bankRunFieldAliases.maxPayment)) || undefined,
+    totalRepayment: asString(pickFieldValue(fields, schema, bankRunFieldAliases.totalRepayment)) || undefined,
+    expiresAt: asString(pickFieldValue(fields, schema, bankRunFieldAliases.expiryDate)) || undefined,
   };
 }
 
@@ -222,31 +513,40 @@ function makeCaseId() {
   return `CASE-${serial}`;
 }
 
-function mapCreateCaseFields(input: CreateCaseInput) {
+async function mapCreateCaseFields(input: CreateCaseInput) {
+  const schema = await getTableSchema(env.airtableCasesTable, caseFieldAliases);
   const source = input.source ? `\n\nSource: ${input.source}` : '';
   const missingItemsCount = input.missingItemsCount ?? 0;
   const portalStatus = input.portalStatus ?? 'not-invited';
-  return {
-    'Case ID': makeCaseId(),
-    'Lead name': input.leadName,
-    'Spouse name': input.spouseName || '',
-    Phone: input.phone,
-    Email: input.email || '',
-    'Case type': input.caseType,
-    'Borrower profiles': input.borrowerProfiles.join(', '),
-    'Current stage': input.stage || 'new-lead',
-    'Assigned staff': input.assignedTo || 'Unassigned',
-    'Missing items count': missingItemsCount,
-    'Client portal status': portalStatus,
-    'Fillout submission id': input.submissionId || '',
-    'Next action': input.nextAction || 'Review intake and move the case forward.',
-    Notes: `${input.notes || ''}${source}`.trim(),
-  };
+
+  return buildWriteFields(
+    schema,
+    caseFieldAliases,
+    {
+      caseId: makeCaseId(),
+      leadName: input.leadName,
+      spouseName: input.spouseName || '',
+      phone: input.phone,
+      email: input.email || '',
+      caseType: input.caseType,
+      borrowerProfiles: input.borrowerProfiles.join(', '),
+      currentStage: input.stage || 'new-lead',
+      assignedStaff: input.assignedTo || 'Unassigned',
+      missingItemsCount,
+      clientPortalStatus: portalStatus,
+      filloutSubmissionId: input.submissionId || '',
+      nextAction: input.nextAction || 'Review intake and move the case forward.',
+      notes: `${input.notes || ''}${source}`.trim(),
+    },
+    { required: ['caseId', 'leadName', 'phone'], table: env.airtableCasesTable },
+  );
 }
 
 export async function listAirtableCases(): Promise<ActionResult<CaseRecord[]>> {
+  const schema = await getTableSchema(env.airtableCasesTable, caseFieldAliases);
+  const sortField = resolveFieldName(schema, caseFieldAliases.leadName) || 'Lead name';
   const result = await listAirtableRecords<AirtableCaseFields>(env.airtableCasesTable, {
-    'sort[0][field]': 'Lead name',
+    'sort[0][field]': sortField,
     'sort[0][direction]': 'asc',
   });
 
@@ -254,11 +554,12 @@ export async function listAirtableCases(): Promise<ActionResult<CaseRecord[]>> {
     return { ok: false, error: result.error || 'Failed to list Airtable cases' };
   }
 
-  return { ok: true, data: result.data.map(mapAirtableCase) };
+  return { ok: true, data: await Promise.all(result.data.map(mapAirtableCase)) };
 }
 
 export async function getAirtableCaseEntityByCaseId(caseId: string): Promise<ActionResult<AirtableCaseEntity>> {
-  const result = await findAirtableRecordByField<AirtableCaseFields>(env.airtableCasesTable, 'Case ID', caseId);
+  const schema = await getTableSchema(env.airtableCasesTable, caseFieldAliases);
+  const result = await findAirtableRecordByAliases<AirtableCaseFields>(env.airtableCasesTable, schema, caseFieldAliases.caseId, caseId);
   if (!result.ok || !result.data) {
     return { ok: false, error: result.error || 'Case not found in Airtable' };
   }
@@ -267,7 +568,7 @@ export async function getAirtableCaseEntityByCaseId(caseId: string): Promise<Act
     ok: true,
     data: {
       recordId: result.data.id,
-      case: mapAirtableCase(result.data),
+      case: await mapAirtableCase(result.data),
     },
   };
 }
@@ -279,38 +580,62 @@ export async function getAirtableCaseByCaseId(caseId: string): Promise<ActionRes
 }
 
 export async function createAirtableCase(input: CreateCaseInput): Promise<ActionResult<CaseRecord>> {
-  const created = await createAirtableRecord(env.airtableCasesTable, mapCreateCaseFields(input));
+  const mapped = await mapCreateCaseFields(input);
+  if (mapped.missing.length) {
+    return { ok: false, error: `Cases table is missing required fields: ${mapped.missing.join(', ')}` };
+  }
+
+  const created = await createAirtableRecord(env.airtableCasesTable, mapped.fields);
   if (!created.ok || !created.data) {
     return { ok: false, error: created.error || 'Failed to create Airtable case' };
   }
 
   const record = { id: created.data.id, fields: created.data.fields } satisfies AirtableRecord<AirtableCaseFields>;
-  return { ok: true, data: mapAirtableCase(record) };
+  return { ok: true, data: await mapAirtableCase(record) };
 }
 
 export async function updateAirtableCase(caseId: string, input: CaseUpdateInput): Promise<ActionResult<CaseRecord>> {
   const entity = await getAirtableCaseEntityByCaseId(caseId);
   if (!entity.ok || !entity.data) return { ok: false, error: entity.error || 'Case not found' };
 
+  const schema = await getTableSchema(env.airtableCasesTable, caseFieldAliases);
   const notesAppend = input.notesAppend?.trim();
-  const currentNotesRecord = await findAirtableRecordByField<AirtableCaseFields>(env.airtableCasesTable, 'Case ID', caseId);
-  const currentNotes = currentNotesRecord.ok && currentNotesRecord.data ? asString(currentNotesRecord.data.fields['Notes']) : '';
+  const currentNotesFieldName = resolveFieldName(schema, caseFieldAliases.notes);
+  let currentNotes = '';
 
-  const fields: Record<string, unknown> = {};
-  if (input.stage) fields['Current stage'] = input.stage;
-  if (typeof input.assignedTo === 'string') fields['Assigned staff'] = input.assignedTo;
-  if (typeof input.portalStatus === 'string') fields['Client portal status'] = input.portalStatus;
-  if (typeof input.nextAction === 'string') fields['Next action'] = input.nextAction;
-  if (typeof input.missingItemsCount === 'number') fields['Missing items count'] = input.missingItemsCount;
-  if (notesAppend) {
-    fields.Notes = [currentNotes.trim(), notesAppend].filter(Boolean).join('\n\n');
+  if (notesAppend && currentNotesFieldName) {
+    const currentNotesRecord = await findAirtableRecordByAliases<AirtableCaseFields>(
+      env.airtableCasesTable,
+      schema,
+      caseFieldAliases.caseId,
+      caseId,
+    );
+    currentNotes = currentNotesRecord.ok && currentNotesRecord.data ? asString(currentNotesRecord.data.fields[currentNotesFieldName]) : '';
   }
 
-  const updated = await updateAirtableRecord(env.airtableCasesTable, entity.data.recordId, fields);
+  const mapped = buildWriteFields(
+    schema,
+    caseFieldAliases,
+    {
+      currentStage: input.stage,
+      assignedStaff: typeof input.assignedTo === 'string' ? input.assignedTo : undefined,
+      clientPortalStatus: typeof input.portalStatus === 'string' ? input.portalStatus : undefined,
+      nextAction: typeof input.nextAction === 'string' ? input.nextAction : undefined,
+      missingItemsCount: typeof input.missingItemsCount === 'number' ? input.missingItemsCount : undefined,
+      notes: notesAppend ? [currentNotes.trim(), notesAppend].filter(Boolean).join('\n\n') : undefined,
+    },
+    { table: env.airtableCasesTable },
+  );
+
+  if (!Object.keys(mapped.fields).length) {
+    return { ok: true, data: entity.data.case };
+  }
+
+  const updated = await updateAirtableRecord(env.airtableCasesTable, entity.data.recordId, mapped.fields);
   if (!updated.ok || !updated.data) return { ok: false, error: updated.error || 'Failed to update case' };
 
   const record = { id: updated.data.id, fields: updated.data.fields } satisfies AirtableRecord<AirtableCaseFields>;
-  return { ok: true, data: mapAirtableCase(record) };
+  return { ok: true, data: await mapAirtableCase(record) };
 }
 
 export async function updateAirtableCaseStage(caseId: string, stage: CaseStage): Promise<ActionResult<CaseRecord>> {
@@ -327,14 +652,26 @@ export async function createAirtableActivityLog(caseId: string, eventType: strin
     return { ok: false, error: entity.error || 'Case not found for activity log' } as const;
   }
 
-  return createAirtableRecord(env.airtableActivityLogTable, {
-    'Case link': caseId,
-    Actor: actor,
-    'Event type': eventType,
-    Summary: summary,
-    'Source system': 'keypoint-app',
-    Timestamp: new Date().toISOString(),
-  });
+  const schema = await getTableSchema(env.airtableActivityLogTable, activityLogFieldAliases);
+  const mapped = buildWriteFields(
+    schema,
+    activityLogFieldAliases,
+    {
+      caseLink: caseId,
+      actor,
+      eventType,
+      summary,
+      sourceSystem: 'keypoint-app',
+      timestamp: new Date().toISOString(),
+    },
+    { required: ['caseLink', 'eventType', 'summary'], table: env.airtableActivityLogTable },
+  );
+
+  if (mapped.missing.length) {
+    return { ok: false, error: `Activity log table is missing required fields: ${mapped.missing.join(', ')}` } as const;
+  }
+
+  return createAirtableRecord(env.airtableActivityLogTable, mapped.fields);
 }
 
 export async function createAirtableCaseDocument(caseId: string, documentCode: string, fileUrl: string, status = 'uploaded') {
@@ -343,18 +680,38 @@ export async function createAirtableCaseDocument(caseId: string, documentCode: s
     return { ok: false, error: entity.error || 'Case not found for document record' } as const;
   }
 
-  return createAirtableRecord(env.airtableDocumentsTable, {
-    'Case link': caseId,
-    'Document code': documentCode,
-    Status: status,
-    'Uploaded file URL': fileUrl,
-  });
+  const schema = await getTableSchema(env.airtableDocumentsTable, documentFieldAliases);
+  const mapped = buildWriteFields(
+    schema,
+    documentFieldAliases,
+    {
+      caseLink: caseId,
+      documentCode,
+      status,
+      uploadedFileUrl: fileUrl,
+    },
+    { required: ['caseLink', 'documentCode', 'status'], table: env.airtableDocumentsTable },
+  );
+
+  if (mapped.missing.length) {
+    return { ok: false, error: `Case documents table is missing required fields: ${mapped.missing.join(', ')}` } as const;
+  }
+
+  return createAirtableRecord(env.airtableDocumentsTable, mapped.fields);
 }
 
 export async function listAirtableBankRuns(caseId: string): Promise<ActionResult<BankOffer[]>> {
+  const schema = await getTableSchema(env.airtableBankRunsTable, bankRunFieldAliases);
+  const caseLinkField = resolveFieldName(schema, bankRunFieldAliases.caseLink);
+  const bankNameField = resolveFieldName(schema, bankRunFieldAliases.bankName) || 'Bank name';
+
+  if (!caseLinkField) {
+    return { ok: false, error: 'Bank runs table does not include a case link field' };
+  }
+
   const result = await listAirtableRecords<AirtableBankRunFields>(env.airtableBankRunsTable, {
-    filterByFormula: `{Case link}='${caseId.replace(/'/g, "\\'")}'`,
-    'sort[0][field]': 'Bank name',
+    filterByFormula: `{${caseLinkField}}='${caseId.replace(/'/g, "\\'")}'`,
+    'sort[0][field]': bankNameField,
     'sort[0][direction]': 'asc',
   });
 
@@ -362,7 +719,7 @@ export async function listAirtableBankRuns(caseId: string): Promise<ActionResult
     return { ok: false, error: result.error || 'Failed to list bank runs' };
   }
 
-  return { ok: true, data: result.data.map(mapAirtableBankRun) };
+  return { ok: true, data: await Promise.all(result.data.map(mapAirtableBankRun)) };
 }
 
 export async function createAirtableBankRun(input: CreateBankOfferInput) {
@@ -371,50 +728,99 @@ export async function createAirtableBankRun(input: CreateBankOfferInput) {
     return { ok: false, error: entity.error || 'Case not found for bank run' } as const;
   }
 
-  return createAirtableRecord(env.airtableBankRunsTable, {
-    'Case link': input.caseId,
-    'Bank name': input.bank,
-    Status: input.status,
-    'First payment': input.firstPayment || '',
-    'Max payment': input.maxPayment || '',
-    'Total repayment': input.totalRepayment || '',
-    'Expiry date': input.expiresAt || '',
-    'Conditions / comments': '',
-  });
+  const schema = await getTableSchema(env.airtableBankRunsTable, bankRunFieldAliases);
+  const mapped = buildWriteFields(
+    schema,
+    bankRunFieldAliases,
+    {
+      caseLink: input.caseId,
+      bankName: input.bank,
+      requestedAt: new Date().toISOString(),
+      status: input.status,
+      firstPayment: input.firstPayment || '',
+      maxPayment: input.maxPayment || '',
+      totalRepayment: input.totalRepayment || '',
+      expiryDate: input.expiresAt || '',
+      conditions: '',
+    },
+    { required: ['caseLink', 'bankName', 'status'], table: env.airtableBankRunsTable },
+  );
+
+  if (mapped.missing.length) {
+    return { ok: false, error: `Bank runs table is missing required fields: ${mapped.missing.join(', ')}` } as const;
+  }
+
+  return createAirtableRecord(env.airtableBankRunsTable, mapped.fields);
 }
 
 export async function createAirtableAiReviewStub(caseId: string, triggeredBy: string, payloadRef: string) {
   try {
-    return await createAirtableRecord(env.airtableAiReviewsTable, {
-      'Case link': caseId,
-      'Triggered by': triggeredBy,
-      'Anonymized payload ref': payloadRef,
-      'Review status': 'pending',
-    });
+    const schema = await getTableSchema(env.airtableAiReviewsTable, aiReviewFieldAliases);
+    const mapped = buildWriteFields(
+      schema,
+      aiReviewFieldAliases,
+      {
+        caseLink: caseId,
+        triggeredBy,
+        anonymizedPayloadRef: payloadRef,
+        reviewStatus: 'pending',
+      },
+      { required: ['caseLink', 'triggeredBy'], table: env.airtableAiReviewsTable },
+    );
+
+    if (mapped.missing.length) {
+      return { ok: false, error: `AI reviews table is missing required fields: ${mapped.missing.join(', ')}` } as const;
+    }
+
+    return await createAirtableRecord(env.airtableAiReviewsTable, mapped.fields);
   } catch {
     return { ok: false, error: 'AI review table is not available' } as const;
   }
 }
 
 async function createAirtableClientForCaseRecord(caseId: string, fields: Record<string, unknown>) {
-  return createAirtableRecord(env.airtableClientsTable, {
-    ...fields,
-    'Case link': caseId,
-  });
+  const schema = await getTableSchema(env.airtableClientsTable, clientFieldAliases);
+  const mapped = buildWriteFields(
+    schema,
+    clientFieldAliases,
+    {
+      ...fields,
+      caseLink: caseId,
+    },
+    { required: ['caseLink', 'fullName'], table: env.airtableClientsTable },
+  );
+
+  if (mapped.missing.length) {
+    return { ok: false, error: `Clients table is missing required fields: ${mapped.missing.join(', ')}` } as const;
+  }
+
+  return createAirtableRecord(env.airtableClientsTable, mapped.fields);
 }
 
 async function seedAirtableCaseDocumentsForRecord(caseId: string, caseType: CaseType, borrowerProfiles: BorrowerProfile[]) {
+  const schema = await getTableSchema(env.airtableDocumentsTable, documentFieldAliases);
   const documentCodes = getRequiredDocumentCodes(caseType, borrowerProfiles);
 
   const results = await Promise.all(
-    documentCodes.map((documentCode) =>
-      createAirtableRecord(env.airtableDocumentsTable, {
-        'Case link': caseId,
-        'Document code': documentCode,
-        'Required?': true,
-        Status: 'not-uploaded',
-      }),
-    ),
+    documentCodes.map(async (documentCode) => {
+      const mapped = buildWriteFields(
+        schema,
+        documentFieldAliases,
+        {
+          caseLink: caseId,
+          documentCode,
+          required: true,
+          status: 'not-uploaded',
+        },
+        { required: ['caseLink', 'documentCode', 'status'], table: env.airtableDocumentsTable },
+      );
+
+      if (mapped.missing.length) {
+        return { ok: false, error: `Case documents table is missing required fields: ${mapped.missing.join(', ')}` } as const;
+      }
+
+      return createAirtableRecord(env.airtableDocumentsTable, mapped.fields);
+    }),
   );
 
   const failed = results.find((result) => !result.ok);
@@ -429,67 +835,64 @@ export async function createNativeIntakeCase(input: CreateCaseInput & { intake: 
   const normalizedCaseType = normalizeCaseType(input.caseType);
   const normalizedBorrowerProfiles = normalizeBorrowerProfiles(input.borrowerProfiles);
   const requiredDocumentCodes = getRequiredDocumentCodes(normalizedCaseType, normalizedBorrowerProfiles);
-  const created = await createAirtableRecord(
-    env.airtableCasesTable,
-    mapCreateCaseFields({
-      ...input,
-      missingItemsCount: requiredDocumentCodes.length,
-      portalStatus: 'pending-office-approval',
-      caseType: normalizedCaseType,
-      borrowerProfiles: normalizedBorrowerProfiles,
-      nextAction: 'Review intake, approve the case, and send the client progress link.',
-    }),
-  );
+  const created = await createAirtableCase({
+    ...input,
+    missingItemsCount: requiredDocumentCodes.length,
+    portalStatus: 'pending-office-approval',
+    caseType: normalizedCaseType,
+    borrowerProfiles: normalizedBorrowerProfiles,
+    nextAction: 'Review intake, approve the case, and send the client progress link.',
+  });
 
   if (!created.ok || !created.data) {
     return { ok: false, error: created.error || 'Failed to create Airtable case' } as const;
   }
 
-  const caseRecord = mapAirtableCase({ id: created.data.id, fields: created.data.fields });
+  const caseRecord = created.data;
   const caseId = caseRecord.id;
+  const warnings: string[] = [];
 
   const primaryClient = await createAirtableClientForCaseRecord(caseId, {
-    'Full name': input.intake.applicant.fullName.trim(),
-    'ID number': input.intake.applicant.idNumber?.trim() || '',
-    'Preferred language': input.intake.contact.preferredLanguage,
-    'WhatsApp number': input.intake.contact.phone.trim(),
-    Email: input.intake.contact.email?.trim() || '',
+    fullName: input.intake.applicant.fullName.trim(),
+    idNumber: input.intake.applicant.idNumber?.trim() || '',
+    preferredLanguage: input.intake.contact.preferredLanguage,
+    whatsappNumber: input.intake.contact.phone.trim(),
+    email: input.intake.contact.email?.trim() || '',
   });
+  const primaryClientCreated = primaryClient.ok;
 
   if (!primaryClient.ok) {
-    return { ok: false, error: primaryClient.error || 'Case was created but primary client creation failed' } as const;
+    warnings.push(primaryClient.error || 'Primary client creation failed');
+    logAirtable('warn', 'Primary client creation failed after case creation', { caseId, error: primaryClient.error });
   }
 
+  let secondaryClientCreated = false;
   if (input.intake.coApplicant.hasCoApplicant && input.intake.coApplicant.fullName?.trim()) {
     const secondaryClient = await createAirtableClientForCaseRecord(caseId, {
-      'Full name': input.intake.coApplicant.fullName.trim(),
-      'ID number': input.intake.coApplicant.idNumber?.trim() || '',
-      'Preferred language': input.intake.contact.preferredLanguage,
-      'WhatsApp number': input.intake.contact.phone.trim(),
-      Email: input.intake.contact.email?.trim() || '',
+      fullName: input.intake.coApplicant.fullName.trim(),
+      idNumber: input.intake.coApplicant.idNumber?.trim() || '',
+      preferredLanguage: input.intake.contact.preferredLanguage,
+      whatsappNumber: input.intake.contact.phone.trim(),
+      email: input.intake.contact.email?.trim() || '',
     });
+    secondaryClientCreated = secondaryClient.ok;
 
     if (!secondaryClient.ok) {
-      return { ok: false, error: secondaryClient.error || 'Case was created but co-applicant creation failed' } as const;
+      warnings.push(secondaryClient.error || 'Co-applicant creation failed');
+      logAirtable('warn', 'Co-applicant creation failed after case creation', { caseId, error: secondaryClient.error });
     }
   }
 
   const seededDocuments = await seedAirtableCaseDocumentsForRecord(caseId, normalizedCaseType, normalizedBorrowerProfiles);
   if (!seededDocuments.ok) {
-    return { ok: false, error: seededDocuments.error || 'Case was created but document checklist seeding failed' } as const;
+    warnings.push(seededDocuments.error || 'Document checklist seeding failed');
+    logAirtable('warn', 'Document checklist seeding failed after case creation', { caseId, error: seededDocuments.error });
   }
 
-  const activity = await createAirtableRecord(env.airtableActivityLogTable, {
-    'Case link': caseId,
-    Actor: 'system',
-    'Event type': 'intake_received',
-    Summary: 'Native intake captured and case seeded',
-    'Source system': 'native-intake',
-    Timestamp: new Date().toISOString(),
-  });
-
+  const activity = await createAirtableActivityLog(caseId, 'intake_received', 'Native intake captured and case seeded', 'system');
   if (!activity.ok) {
-    return { ok: false, error: activity.error || 'Case was created but activity log creation failed' } as const;
+    warnings.push(activity.error || 'Activity log creation failed');
+    logAirtable('warn', 'Activity log creation failed after case creation', { caseId, error: activity.error });
   }
 
   return {
@@ -497,7 +900,8 @@ export async function createNativeIntakeCase(input: CreateCaseInput & { intake: 
     data: caseRecord,
     meta: {
       requiredDocumentCodes,
-      clientsCreated: input.intake.coApplicant.hasCoApplicant && input.intake.coApplicant.fullName?.trim() ? 2 : 1,
+      clientsCreated: Number(primaryClientCreated) + Number(secondaryClientCreated),
+      warnings,
     },
   } as const;
 }

@@ -40,6 +40,8 @@ The current live KeyPoint Airtable base is flatter than the idealized schema abo
 
 The app now writes to the live base in that compatible text-first format so native intake works end-to-end against the existing production Airtable base.
 
+As of the latest hardening pass, the app also introspects Airtable table metadata and resolves field names case-insensitively / alias-first where practical, so small label drift is less likely to break create, update, invite, or offer flows outright.
+
 ## 3. Document library
 Master list of supported documents.
 
