@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import type { NextRequest } from 'next/server';
 import { env, isProductionLike } from '@/lib/env';
-import { requestHasOfficeSession } from '@/lib/office-auth';
+import { requestHasStaffSession } from '@/lib/staff-session';
 
 function timingSafeEqualString(a: string, b: string): boolean {
   const aBuf = Buffer.from(a, 'utf8');
@@ -11,7 +11,7 @@ function timingSafeEqualString(a: string, b: string): boolean {
 }
 
 export async function authorizeN8nForwarder(req: NextRequest): Promise<{ ok: true } | { ok: false; message: string }> {
-  if (await requestHasOfficeSession(req)) {
+  if (await requestHasStaffSession(req)) {
     return { ok: true };
   }
 
@@ -27,7 +27,7 @@ export async function authorizeN8nForwarder(req: NextRequest): Promise<{ ok: tru
   if (isProductionLike()) {
     return {
       ok: false,
-      message: 'Set N8N_FORWARDER_SECRET and send it as x-keypoint-forwarder-secret, or sign in to the office',
+      message: 'Set N8N_FORWARDER_SECRET and send it as x-keypoint-forwarder-secret, or sign in as staff in the browser',
     };
   }
 

@@ -5,7 +5,7 @@ import { createNativeIntakeCase } from '@/lib/airtable';
 import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
 import { postJson, triggerN8n } from '@/lib/n8n';
 import { env } from '@/lib/env';
-import { currentRequestHasOfficeSession } from '@/lib/office-auth';
+import { currentRequestHasStaffSession } from '@/lib/staff-session';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -124,8 +124,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!(await currentRequestHasOfficeSession())) {
-    return NextResponse.json({ ok: false, error: 'Office authentication required' }, { status: 401 });
+  if (!(await currentRequestHasStaffSession())) {
+    return NextResponse.json({ ok: false, error: 'Staff sign-in required' }, { status: 401 });
   }
 
   const leadName = body.leadName as string | undefined;

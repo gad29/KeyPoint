@@ -1,11 +1,22 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/components/i18n';
 import { UploadForm } from '@/components/forms/upload-form';
-import { borrowerProfileOptions, caseTypeOptions, type IntakePayload } from '@/lib/intake';
+import { documentLibrary } from '@/data/domain';
+import { borrowerProfileOptions, caseTypeOptions, getRequiredDocumentCodes, type IntakePayload } from '@/lib/intake';
 
-type StepKey = 'applicant' | 'coApplicant' | 'contact' | 'caseType' | 'income' | 'property' | 'liabilities' | 'consent' | 'review';
+type StepKey =
+  | 'applicant'
+  | 'coApplicant'
+  | 'contact'
+  | 'caseType'
+  | 'income'
+  | 'property'
+  | 'liabilities'
+  | 'consent'
+  | 'documents'
+  | 'review';
 
 type Lang = 'en' | 'he';
 
@@ -20,6 +31,12 @@ const steps: StepDefinition[] = [
   { key: 'property', label: { en: 'Property', he: 'נכס' }, title: { en: 'Property', he: 'נכס' }, description: { en: 'Rough numbers are fine.', he: 'מספיקה הערכה.' } },
   { key: 'liabilities', label: { en: 'Liabilities', he: 'התחייבויות' }, title: { en: 'Loans & debt', he: 'הלוואות' }, description: { en: 'Existing monthly obligations.', he: 'התחייבויות חודשיות.' } },
   { key: 'consent', label: { en: 'Consent', he: 'אישורים' }, title: { en: 'Consent', he: 'אישורים' }, description: { en: 'Required to process your file.', he: 'נדרש לטיפול בתיק.' } },
+  {
+    key: 'documents',
+    label: { en: 'Documents', he: 'מסמכים' },
+    title: { en: 'Upload required documents', he: 'העלאת מסמכים נדרשים' },
+    description: { en: 'Attach clear PDFs or photos for each item.', he: 'צרפו קבצי PDF או צילומים ברורים לכל סעיף.' },
+  },
   { key: 'review', label: { en: 'Review', he: 'סקירה' }, title: { en: 'Review & send', he: 'סקירה ושליחה' }, description: { en: 'Check and submit.', he: 'בדיקה ושליחה.' } },
 ];
 
@@ -102,6 +119,10 @@ const copy = {
     submit: 'Submit case',
     reviewSummary: 'Summary before sending',
     reviewHint: 'Submit opens your file with the office.',
+    documentsRequired: 'Please attach a file for every required document.',
+    documentsNone: 'No extra documents are required for this selection; you can continue.',
+    documentsReview: 'Required documents',
+    uploadPartialWarn: 'Some files could not be uploaded; you can retry below.',
   },
   he: {
     nativeIntake: 'פתיחת תיק חדש',
@@ -169,6 +190,10 @@ const copy = {
     submit: 'שליחת תיק',
     reviewSummary: 'סיכום לפני שליחה',
     reviewHint: 'השליחה פותחת את התיק מול המשרד.',
+    documentsRequired: 'יש לצרף קובץ לכל מסמך נדרש.',
+    documentsNone: 'אין מסמכים נוספים נדרשים לבחירה זו; אפשר להמשיך.',
+    documentsReview: 'מסמכים נדרשים',
+    uploadPartialWarn: 'חלק מהקבצים לא הועלו; אפשר לנסות שוב למטה.',
   },
 };
 
@@ -183,10 +208,29 @@ export function IntakeForm() {
   const [form, setForm] = useState<IntakePayload>(initialState);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<null | { caseId: string; submissionId: string; intakeSource: string; seededDocuments: string[] }>(null);
+  const [filesByCode, setFilesByCode] = useState<Record<string, File | null>>({});
+  const [success, setSuccess] = useState<
+    null | { caseId: string; submissionId: string; intakeSource: string; seededDocuments: string[]; uploadFailures: string[] }
+  >(null);
+
+  const requiredCodes = useMemo(
+    () => getRequiredDocumentCodes(form.caseType, form.incomeProfile.borrowerProfiles),
+    [form.caseType, form.incomeProfile.borrowerProfiles],
+  );
+  const requiredCodesKey = requiredCodes.join('|');
+
+  useEffect(() => {
+    setFilesByCode({});
+  }, [requiredCodesKey]);
 
   const currentStep = steps[stepIndex];
   const progress = ((stepIndex + 1) / steps.length) * 100;
+
+  const documentsReviewValue = useMemo(() => {
+    if (!requiredCodes.length) return t.documentsNone;
+    const done = requiredCodes.filter((code) => filesByCode[code] instanceof File).length;
+    return `${done}/${requiredCodes.length}`;
+  }, [requiredCodes, filesByCode, t.documentsNone]);
 
   const reviewItems = useMemo(
     () => [
@@ -196,8 +240,9 @@ export function IntakeForm() {
       { label: steps[4].label[language], value: form.incomeProfile.borrowerProfiles.length ? form.incomeProfile.borrowerProfiles.join(', ') : t.missing },
       { label: t.propertyCity, value: form.property.propertyCity || t.notProvided },
       { label: steps[7].label[language], value: form.consent.privacyAccepted && form.consent.advisorAuthorizationAccepted && form.consent.accuracyConfirmed ? t.complete : t.approvalsMissing },
+      { label: t.documentsReview, value: documentsReviewValue },
     ],
-    [form, language, t],
+    [documentsReviewValue, form, language, t],
   );
 
   function updateSection<K extends keyof IntakePayload>(section: K, values: Partial<IntakePayload[K]>) {
@@ -225,6 +270,20 @@ export function IntakeForm() {
         return null;
       case 'consent':
         if (!form.consent.privacyAccepted || !form.consent.advisorAuthorizationAccepted || !form.consent.accuracyConfirmed) return t.consentRequired;
+        return null;
+      case 'documents':
+        if (!requiredCodes.length) return null;
+        for (const code of requiredCodes) {
+          const file = filesByCode[code];
+          if (!file || !(file instanceof File)) return t.documentsRequired;
+        }
+        return null;
+      case 'review':
+        if (!requiredCodes.length) return null;
+        for (const code of requiredCodes) {
+          const file = filesByCode[code];
+          if (!file || !(file instanceof File)) return t.documentsRequired;
+        }
         return null;
       default:
         return null;
@@ -256,11 +315,24 @@ export function IntakeForm() {
       });
       const json = await response.json();
       if (!response.ok || !json.ok) throw new Error(json.error || t.submitFail);
+      const caseId = json.data?.id || 'pending';
+      const uploadFailures: string[] = [];
+      for (const code of requiredCodes) {
+        const file = filesByCode[code];
+        if (!file) continue;
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('caseId', caseId);
+        fd.append('documentCode', code);
+        const up = await fetch('/api/uploads', { method: 'POST', body: fd });
+        if (!up.ok) uploadFailures.push(code);
+      }
       setSuccess({
-        caseId: json.data?.id || 'pending',
+        caseId,
         submissionId: json.meta?.submissionId || 'pending',
         intakeSource: json.meta?.source || 'native-intake',
         seededDocuments: Array.isArray(json.meta?.seededDocuments) ? json.meta.seededDocuments : [],
+        uploadFailures,
       });
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : t.submitFailShort);
@@ -284,12 +356,29 @@ export function IntakeForm() {
           <p className="eyebrow">{t.successEyebrow}</p>
           <h2>{t.successTitle}</h2>
           <p className="muted">{t.successBody}</p>
+          {success.uploadFailures.length ? (
+            <p className="muted" style={{ color: '#fbbf24' }}>
+              {t.uploadPartialWarn}{' '}
+              {success.uploadFailures.join(', ')}
+            </p>
+          ) : null}
           <div className="review-grid compact">
             <div className="review-row"><span>{t.caseId}</span><strong>{success.caseId}</strong></div>
             <div className="review-row"><span>{t.submissionId}</span><strong>{success.submissionId}</strong></div>
           </div>
           <div className="inline-actions">
-            <button className="button" type="button" onClick={() => { setForm(initialState); setSuccess(null); setStepIndex(0); }}>{t.startAnother}</button>
+            <button
+              className="button"
+              type="button"
+              onClick={() => {
+                setForm(initialState);
+                setFilesByCode({});
+                setSuccess(null);
+                setStepIndex(0);
+              }}
+            >
+              {t.startAnother}
+            </button>
           </div>
           <p className="eyebrow" style={{ marginTop: 28 }}>{t.uploadNow}</p>
           <p className="muted">{t.uploadNowNote}</p>
@@ -383,6 +472,36 @@ export function IntakeForm() {
             <label className={`choice-card toggle-row ${form.consent.accuracyConfirmed ? 'selected' : ''}`}><input type="checkbox" checked={form.consent.accuracyConfirmed} onChange={(e) => updateSection('consent', { accuracyConfirmed: e.target.checked })} /><div><strong>{t.accuracy}</strong><p className="muted">{t.accuracyNote}</p></div></label>
             <label className="field field-span-2"><span>{t.notes}</span><textarea value={form.notes} onChange={(e) => setForm((current) => ({ ...current, notes: e.target.value }))} /></label>
           </div>}
+
+          {currentStep.key === 'documents' && (
+            <div className="grid">
+              {!requiredCodes.length ? (
+                <p className="muted">{t.documentsNone}</p>
+              ) : (
+                <div className="form-grid cols-2">
+                  {requiredCodes.map((code) => {
+                    const meta = documentLibrary.find((d) => d.code === code);
+                    const label = language === 'he' ? meta?.labelHe || code : meta?.labelEn || code;
+                    const desc = meta?.description;
+                    return (
+                      <label key={code} className="field field-span-2">
+                        <span>{label}</span>
+                        {desc ? <p className="muted" style={{ margin: '0 0 6px', fontSize: 13 }}>{desc}</p> : null}
+                        <input
+                          type="file"
+                          accept=".pdf,image/*,application/pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            setFilesByCode((prev) => ({ ...prev, [code]: file ?? null }));
+                          }}
+                        />
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
           {currentStep.key === 'review' && <div className="grid">
             <div className="review-grid">{reviewItems.map((item) => <div key={item.label} className="review-row"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>

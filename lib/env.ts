@@ -7,6 +7,9 @@ export const env = {
   airtableActivityLogTable: process.env.AIRTABLE_ACTIVITY_LOG_TABLE || 'Activity log',
   airtableBankRunsTable: process.env.AIRTABLE_BANK_RUNS_TABLE || 'Bank runs',
   airtableAiReviewsTable: process.env.AIRTABLE_AI_REVIEWS_TABLE || 'AI reviews',
+  airtableStaffTable: process.env.AIRTABLE_STAFF_TABLE || 'Staff',
+  staffSessionSecret: process.env.STAFF_SESSION_SECRET,
+  staffRegisterSecret: process.env.STAFF_REGISTER_SECRET,
   n8nWebhookBaseUrl: process.env.N8N_WEBHOOK_BASE_URL,
   /** Shared secret for POST /api/webhooks/n8n when not using an office session (optional in local dev). */
   n8nForwarderSecret: process.env.N8N_FORWARDER_SECRET,
@@ -70,6 +73,15 @@ export function hasPortalInviteSecret() {
 
 export function hasOfficeAuthConfig() {
   return Boolean(env.officeAccessCode && !looksLikePlaceholder(env.officeAccessCode));
+}
+
+export function hasStaffRegisterSecret() {
+  return Boolean(env.staffRegisterSecret && !looksLikePlaceholder(env.staffRegisterSecret));
+}
+
+/** Staff email/password login requires Airtable (users stored in Staff table). */
+export function canUseStaffLogin() {
+  return hasAirtableConfig();
 }
 
 export function hasOfficeAlertsConfig() {

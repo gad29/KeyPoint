@@ -181,7 +181,7 @@ export function OfficePageClient({ cases, offersByCase, liveMode, bucket }: Offi
   const labels = stageLabels[language];
 
   async function signOut() {
-    await fetch('/api/office/logout', { method: 'POST' });
+    await fetch('/api/auth/staff/logout', { method: 'POST' });
     window.location.href = '/login';
   }
   const [selectedCaseId, setSelectedCaseId] = useState(cases[0]?.id || '');

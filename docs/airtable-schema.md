@@ -132,3 +132,12 @@ Fields:
 - Missing items found
 - Risk flags
 - Suggested next steps
+
+## 10. Staff (office login)
+Used for email + password sign-in to `/office`. Passwords are **bcrypt hashes** only (never store plain text). Use a **Long text** field for the hash if single-line truncates.
+
+Fields (names expected by the app; adjust in code if your base differs):
+- Email (single line; stored lowercase)
+- Password hash (long text recommended)
+- Full name (optional)
+- Active (checkbox; unchecked users cannot sign in)

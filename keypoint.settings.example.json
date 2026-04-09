@@ -5,6 +5,8 @@
     "officeAccessCode": "",
     "officeSessionSecret": "",
     "officeSessionHours": 12,
+    "staffSessionSecret": "",
+    "staffRegisterSecret": "",
     "n8nForwarderSecret": ""
   },
   "airtable": {
@@ -19,7 +21,8 @@
       "appraisers": "Appraisers",
       "appraisalJobs": "Appraisal jobs",
       "activityLog": "Activity log",
-      "aiReviews": "AI reviews"
+      "aiReviews": "AI reviews",
+      "staff": "Staff"
     }
   },
   "storage": {

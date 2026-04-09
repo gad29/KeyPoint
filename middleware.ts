@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { requestHasOfficeSession } from '@/lib/office-auth';
+import { requestHasStaffSession } from '@/lib/staff-session';
 
 function isCasesListPath(pathname: string) {
   return pathname === '/api/cases' || pathname === '/api/cases/';
@@ -29,12 +29,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (await requestHasOfficeSession(request)) {
+  if (await requestHasStaffSession(request)) {
     return NextResponse.next();
   }
 
   if (pathname.startsWith('/api/')) {
-    return NextResponse.json({ ok: false, error: 'Office authentication required' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'Staff sign-in required' }, { status: 401 });
   }
 
   const loginUrl = new URL('/login', request.url);
