@@ -76,9 +76,8 @@ pre { white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; }
 .button.button-textlike { background: transparent; border: none; box-shadow: none; color: var(--muted); font-weight: 600; padding: 8px 0; text-align: start; width: 100%; }
 .button.button-textlike:hover:not(:disabled) { color: var(--accent-strong); }
 
-.login-page-grid { display: grid; gap: 24px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); align-items: start; }
+.login-staff-only { width: 100%; }
 .staff-login-card { border-color: rgba(129, 140, 248, 0.42); box-shadow: 0 14px 42px rgba(99, 102, 241, 0.14); }
-.login-client-card { opacity: 0.96; }
 .login-register-zone { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
 
 .public-root { min-height: 100vh; display: flex; flex-direction: column; }

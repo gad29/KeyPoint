@@ -12,11 +12,6 @@ type LoginFormProps = {
 
 const copy = {
   en: {
-    clientEyebrow: 'Client',
-    clientTitle: 'Track your file',
-    clientBody: 'Paste the progress token you received from the office.',
-    tokenLabel: 'Progress token',
-    tokenCta: 'Continue',
     staffEyebrow: 'Staff',
     staffTitle: 'Sign in to the workspace',
     staffBody: 'Use your staff email and password. Clients cannot access this area.',
@@ -39,11 +34,6 @@ const copy = {
     registerError: 'Registration failed',
   },
   he: {
-    clientEyebrow: 'לקוחות',
-    clientTitle: 'מעקב אחרי התיק',
-    clientBody: 'הדביקו את טוקן המעקב שקיבלתם מהמשרד.',
-    tokenLabel: 'טוקן מעקב',
-    tokenCta: 'המשך',
     staffEyebrow: 'צוות',
     staffTitle: 'כניסה לסביבת העבודה',
     staffBody: 'התחברו עם אימייל וסיסמה של צוות. אזור זה אינו זמין ללקוחות.',
@@ -71,8 +61,6 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
   const { language, dir } = useI18n();
   const t = copy[language];
   const router = useRouter();
-
-  const [token, setToken] = useState('');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -135,26 +123,7 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
   }
 
   return (
-    <div className="login-page-grid" dir={dir}>
-      <form
-        className="card login-client-card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (token.trim()) router.push(`/progress/${token.trim()}` as never);
-        }}
-      >
-        <p className="eyebrow">{t.clientEyebrow}</p>
-        <h2>{t.clientTitle}</h2>
-        <p className="muted">{t.clientBody}</p>
-        <label className="field">
-          <span>{t.tokenLabel}</span>
-          <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="" autoComplete="off" />
-        </label>
-        <button className="button" type="submit">
-          {t.tokenCta}
-        </button>
-      </form>
-
+    <div className="login-staff-only" dir={dir}>
       <div className="card staff-login-card">
         <p className="eyebrow">{t.staffEyebrow}</p>
         <h2>{t.staffTitle}</h2>
