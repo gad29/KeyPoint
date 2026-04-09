@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCase, setCaseStage } from '@/lib/repository';
+import { getCase, updateCase } from '@/lib/repository';
 import type { CaseStage } from '@/data/domain';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ caseId: string }> }) {
@@ -17,10 +17,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ ca
   const body = await req.json();
   const stage = body?.stage as CaseStage | undefined;
 
-  if (!stage) {
-    return NextResponse.json({ ok: false, error: 'stage is required' }, { status: 400 });
-  }
+  const result = await updateCase(caseId, {
+    stage,
+    assignedTo: typeof body?.assignedTo === 'string' ? body.assignedTo : undefined,
+    notesAppend: typeof body?.notesAppend === 'string' ? body.notesAppend : undefined,
+    portalStatus: typeof body?.portalStatus === 'string' ? body.portalStatus : undefined,
+    nextAction: typeof body?.nextAction === 'string' ? body.nextAction : undefined,
+    missingItemsCount: typeof body?.missingItemsCount === 'number' ? body.missingItemsCount : undefined,
+  });
 
-  const result = await setCaseStage(caseId, stage);
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });
 }

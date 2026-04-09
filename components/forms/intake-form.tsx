@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useI18n } from '@/components/i18n';
+import { UploadForm } from '@/components/forms/upload-form';
 import { borrowerProfileOptions, caseTypeOptions, type IntakePayload } from '@/lib/intake';
 
 type StepKey = 'applicant' | 'coApplicant' | 'contact' | 'caseType' | 'income' | 'property' | 'liabilities' | 'consent' | 'review';
@@ -57,6 +58,8 @@ const copy = {
     submissionId: 'Submission ID',
     source: 'Source',
     startAnother: 'Start another case',
+    uploadNow: 'Upload first documents',
+    uploadNowNote: 'You can attach the first files now. The office can keep updating the case afterward.',
     of: 'of',
     fullName: 'Full name *',
     idNumber: 'ID number',
@@ -125,6 +128,8 @@ const copy = {
     submissionId: 'מספר שליחה',
     source: 'מקור',
     startAnother: 'פתיחת תיק נוסף',
+    uploadNow: 'העלאת מסמכים ראשונים',
+    uploadNowNote: 'אפשר לצרף כבר עכשיו את הקבצים הראשונים. המשרד ימשיך לעדכן את התיק בהמשך.',
     of: 'מתוך',
     fullName: 'שם מלא *',
     idNumber: 'תעודת זהות',
@@ -184,7 +189,7 @@ export function IntakeForm() {
   const [form, setForm] = useState<IntakePayload>(initialState);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<null | { caseId: string; submissionId: string; intakeSource: string }>(null);
+  const [success, setSuccess] = useState<null | { caseId: string; submissionId: string; intakeSource: string; seededDocuments: string[] }>(null);
 
   const currentStep = steps[stepIndex];
   const progress = ((stepIndex + 1) / steps.length) * 100;
@@ -257,7 +262,12 @@ export function IntakeForm() {
       });
       const json = await response.json();
       if (!response.ok || !json.ok) throw new Error(json.error || t.submitFail);
-      setSuccess({ caseId: json.data?.id || 'pending', submissionId: json.meta?.submissionId || 'pending', intakeSource: json.meta?.source || 'native-intake' });
+      setSuccess({
+        caseId: json.data?.id || 'pending',
+        submissionId: json.meta?.submissionId || 'pending',
+        intakeSource: json.meta?.source || 'native-intake',
+        seededDocuments: Array.isArray(json.meta?.seededDocuments) ? json.meta.seededDocuments : [],
+      });
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : t.submitFailShort);
     } finally {
@@ -274,20 +284,27 @@ export function IntakeForm() {
 
   if (success) {
     return (
-      <section className="card intake-success-card" dir={dir}>
-        <span className="success-mark">✓</span>
-        <p className="eyebrow">{t.successEyebrow}</p>
-        <h2>{t.successTitle}</h2>
-        <p className="muted">{t.successBody}</p>
-        <div className="review-grid compact">
-          <div className="review-row"><span>{t.caseId}</span><strong>{success.caseId}</strong></div>
-          <div className="review-row"><span>{t.submissionId}</span><strong>{success.submissionId}</strong></div>
-          <div className="review-row"><span>{t.source}</span><strong>{success.intakeSource}</strong></div>
-        </div>
-        <div className="inline-actions">
-          <button className="button" type="button" onClick={() => { setForm(initialState); setSuccess(null); setStepIndex(0); }}>{t.startAnother}</button>
-        </div>
-      </section>
+      <div className="grid" dir={dir}>
+        <section className="card intake-success-card">
+          <span className="success-mark">✓</span>
+          <p className="eyebrow">{t.successEyebrow}</p>
+          <h2>{t.successTitle}</h2>
+          <p className="muted">{t.successBody}</p>
+          <div className="review-grid compact">
+            <div className="review-row"><span>{t.caseId}</span><strong>{success.caseId}</strong></div>
+            <div className="review-row"><span>{t.submissionId}</span><strong>{success.submissionId}</strong></div>
+            <div className="review-row"><span>{t.source}</span><strong>{success.intakeSource}</strong></div>
+          </div>
+          <div className="inline-actions">
+            <button className="button" type="button" onClick={() => { setForm(initialState); setSuccess(null); setStepIndex(0); }}>{t.startAnother}</button>
+          </div>
+        </section>
+        <section className="card">
+          <p className="eyebrow">{t.uploadNow}</p>
+          <p className="muted">{t.uploadNowNote}</p>
+        </section>
+        <UploadForm caseId={success.caseId} allowedDocumentCodes={success.seededDocuments} defaultDocumentCode={success.seededDocuments[0] || 'id-card'} />
+      </div>
     );
   }
 

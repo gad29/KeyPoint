@@ -4,16 +4,16 @@ import { useI18n } from '@/components/i18n';
 
 const copy = {
   en: {
-    eyebrow: 'New Case',
-    title: 'Open a mortgage case directly in KeyPoint',
-    body: 'A clear bilingual intake flow for real client work — designed to feel like a finished product, not a temporary form.',
-    status: 'Client-facing intake',
+    eyebrow: 'Start intake',
+    title: 'Open a mortgage case in a few clear steps.',
+    body: 'Share the client details, financing picture, and first notes. After submission you can immediately attach the first documents.',
+    status: 'Client-facing flow',
   },
   he: {
     eyebrow: 'פתיחת תיק',
-    title: 'פתיחת תיק משכנתא ישירות בתוך KeyPoint',
-    body: 'תהליך פתיחה דו-לשוני, ברור ומסודר, שמרגיש כמו מערכת אמיתית לעבודה מול לקוחות — לא כמו טופס זמני.',
-    status: 'טופס פתיחה ללקוח',
+    title: 'פותחים תיק משכנתא בכמה שלבים ברורים.',
+    body: 'ממלאים את פרטי הלקוח, תמונת המימון והערות ראשונות. אחרי השליחה אפשר לצרף מיד את המסמכים הראשונים.',
+    status: 'תהליך ללקוח',
   },
 };
 

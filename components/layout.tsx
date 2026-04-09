@@ -6,21 +6,21 @@ import { I18nProvider, LanguageSwitch, useI18n } from '@/components/i18n';
 
 const nav = [
   { href: '/', label: { en: 'Home', he: 'דף הבית' } },
-  { href: '/intake', label: { en: 'New Case', he: 'פתיחת תיק' } },
-  { href: '/portal', label: { en: 'Client Portal', he: 'אזור לקוחות' } },
-  { href: '/office', label: { en: 'Office', he: 'משרד' } },
+  { href: '/intake', label: { en: 'Start intake', he: 'פתיחת תיק' } },
 ];
 
 const shellCopy = {
   en: {
     name: 'KeyPoint',
-    title: 'Mortgage case management, built for real work',
-    subtitle: 'A clean bilingual workspace for intake, case progress, client communication, and document collection.',
+    title: 'Mortgage cases without the clutter',
+    subtitle: 'Client intake, progress tracking, office review, and offers in one focused workspace.',
+    office: 'Office',
   },
   he: {
     name: 'KeyPoint',
-    title: 'ניהול תיקי משכנתא — בצורה מסודרת, ברורה ומקצועית',
-    subtitle: 'מערכת דו-לשונית לניהול לידים, פתיחת תיקים, מעקב התקדמות, תקשורת עם לקוחות ואיסוף מסמכים.',
+    title: 'ניהול תיקי משכנתא בלי רעש מיותר',
+    subtitle: 'פתיחת תיק, מעקב התקדמות, עבודה משרדית והצעות בנקים במקום אחד.',
+    office: 'משרד',
   },
 };
 
@@ -37,7 +37,10 @@ function AppFrame({ children }: { children: ReactNode }) {
             <h1>{copy.title}</h1>
             <p className="muted">{copy.subtitle}</p>
           </div>
-          <LanguageSwitch />
+          <div className="sidebar-actions">
+            <LanguageSwitch />
+            <Link className="mini-link" href="/office">{copy.office}</Link>
+          </div>
         </div>
         <nav className="nav">
           {nav.map((item) => (

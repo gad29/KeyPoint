@@ -3,6 +3,8 @@ import { listCases, createCase } from '@/lib/repository';
 import { hasAirtableConfig } from '@/lib/env';
 import { createNativeIntakeCase } from '@/lib/airtable';
 import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
+import { postJson, triggerN8n } from '@/lib/n8n';
+import { env } from '@/lib/env';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -35,6 +37,20 @@ function validateNativeIntake(intake: unknown): intake is IntakePayload {
     consent.advisorAuthorizationAccepted === true &&
     consent.accuracyConfirmed === true
   );
+}
+
+async function notifyNewIntake(caseId: string, leadName: string, phone: string) {
+  const payload = { caseId, leadName, phone, stage: 'intake-submitted' };
+
+  if (env.officeAlertWebhookUrl) {
+    return postJson(env.officeAlertWebhookUrl, { kind: 'secretary-alert', ...payload });
+  }
+
+  if (env.n8nWebhookBaseUrl) {
+    return triggerN8n('keypoint/secretary-alert', payload);
+  }
+
+  return { ok: false, error: 'No office alert path configured' } as const;
 }
 
 export async function GET() {
@@ -78,6 +94,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result, { status: 400 });
     }
 
+    await notifyNewIntake(result.data.id, result.data.leadName, result.data.phone);
+
     return NextResponse.json(
       {
         ok: true,
@@ -87,12 +105,7 @@ export async function POST(req: NextRequest) {
           submissionId,
           seededDocuments: result.meta?.requiredDocumentCodes || [],
           clientsCreated: result.meta?.clientsCreated || 0,
-          automationTriggered: false,
-          automation: {
-            ok: false,
-            skipped: true,
-            reason: 'post-create automation is being rebuilt around Airtable-triggered workflows',
-          },
+          automationTriggered: Boolean(env.officeAlertWebhookUrl || env.n8nWebhookBaseUrl),
         },
       },
       { status: 201 },
@@ -123,6 +136,7 @@ export async function POST(req: NextRequest) {
     submissionId: body?.submissionId ? String(body.submissionId) : undefined,
     stage: body?.stage ? String(body.stage) : undefined,
     source: body?.source ? String(body.source) : undefined,
+    nextAction: body?.nextAction ? String(body.nextAction) : undefined,
   });
 
   return NextResponse.json(result, { status: result.ok ? 201 : 400 });

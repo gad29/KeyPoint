@@ -13,52 +13,54 @@ type HomePageClientProps = {
 
 const copy = {
   en: {
-    eyebrow: 'Home',
-    title: 'A mortgage operation your clients can actually trust',
-    body: 'KeyPoint gives your office one clear place for intake, case tracking, document collection, and client follow-up — without the clutter of internal build notes or temporary setup language.',
-    cta: 'Open a new case',
-    statusLive: 'Connected to live data',
-    statusLocal: 'Ready for daily work',
-    statCases: 'Cases in system',
-    statCasesHint: 'Includes active and completed files currently loaded into the workspace.',
-    statReview: 'Needs staff attention',
-    statReviewHint: 'Cases waiting on documents or internal review.',
-    statOffers: 'Bank offers received',
-    statOffersHint: 'Offers already logged for ongoing negotiations.',
-    sectionValue: 'What the system handles',
-    sectionValueItems: [
-      'Client intake in a clear step-by-step flow',
-      'Case tracking for active and completed mortgage files',
-      'Document checklist management for each case type',
-      'Office-side follow-up and client portal access',
+    eyebrow: 'Mortgage intake',
+    title: 'A clean mortgage intake and progress flow for real clients.',
+    body: 'Clients can start a case, upload documents, and later check progress from a simple read-only link. The office gets one concise workspace to move each case forward.',
+    cta: 'Start intake',
+    ctaSecondary: 'Check progress link',
+    office: 'Office login',
+    statusLive: 'Live Airtable workspace',
+    statusLocal: 'Preview mode',
+    statCases: 'Open cases',
+    statCasesHint: 'Current files visible in the workspace.',
+    statReview: 'Office queue',
+    statReviewHint: 'Cases waiting on review or documents.',
+    statOffers: 'Offers logged',
+    statOffersHint: 'Bank offers already added to live files.',
+    sectionTitle: 'How it works',
+    items: [
+      'Client starts intake and uploads the first documents.',
+      'A case is saved to Airtable and queued for the office.',
+      'The client receives a read-only progress link.',
+      'The secretary and advisor move the case through appraisal and bank-offer stages.',
     ],
-    sectionDocs: 'Document coverage',
-    sectionDocsText: 'The document library already includes the core checklist structure for Israeli mortgage workflows, with matching logic by case type and borrower profile.',
-    sectionDocsCount: 'document types currently configured',
+    coverage: 'Configured documents',
+    coverageText: 'The checklist already covers the core mortgage document set and matches required items by case type and borrower profile.',
   },
   he: {
-    eyebrow: 'דף הבית',
-    title: 'מערכת ניהול משכנתאות שנראית כמו מוצר אמיתי',
-    body: 'KeyPoint מרכזת במקום אחד את פתיחת התיק, מעקב ההתקדמות, איסוף המסמכים והתקשורת עם הלקוח — בלי הערות פיתוח, בלי טקסטים זמניים ובלי תחושת דמו.',
-    cta: 'פתיחת תיק חדש',
-    statusLive: 'מחובר לנתונים חיים',
-    statusLocal: 'מוכן לעבודה שוטפת',
-    statCases: 'תיקים במערכת',
-    statCasesHint: 'כולל תיקים פעילים ותיקים שהושלמו ונטענו למערכת.',
-    statReview: 'ממתין לטיפול צוות',
-    statReviewHint: 'תיקים שחסרים בהם מסמכים או ממתינים לבדיקה פנימית.',
-    statOffers: 'הצעות בנק שהתקבלו',
-    statOffersHint: 'הצעות שכבר הוזנו עבור תיקים שנמצאים במשא ומתן.',
-    sectionValue: 'מה המערכת נותנת בפועל',
-    sectionValueItems: [
-      'פתיחת תיק דיגיטלית בתהליך ברור ונעים ללקוח',
-      'ניהול תיקים פעילים ותיקים סגורים במקום אחד',
-      'רשימת מסמכים חכמה לפי סוג תיק ופרופיל לווים',
-      'עבודה משרדית מסודרת לצד אזור לקוח נגיש',
+    eyebrow: 'פתיחת תיק משכנתא',
+    title: 'תהליך נקי וברור ללקוח ולמשרד.',
+    body: 'הלקוח יכול לפתוח תיק, להעלות מסמכים ולעקוב אחר ההתקדמות דרך קישור צפייה פשוט. המשרד מקבל מסך עבודה מסודר לקידום כל תיק.',
+    cta: 'התחלת פתיחת תיק',
+    ctaSecondary: 'בדיקת קישור התקדמות',
+    office: 'כניסת משרד',
+    statusLive: 'מחובר ל-Airtable',
+    statusLocal: 'מצב תצוגה',
+    statCases: 'תיקים פתוחים',
+    statCasesHint: 'התיקים שזמינים כרגע במערכת.',
+    statReview: 'תור עבודה למשרד',
+    statReviewHint: 'תיקים שממתינים לבדיקה או למסמכים.',
+    statOffers: 'הצעות שנשמרו',
+    statOffersHint: 'הצעות בנק שכבר נוספו לתיקים.',
+    sectionTitle: 'איך זה עובד',
+    items: [
+      'הלקוח פותח תיק ומעלה מסמכים ראשונים.',
+      'נוצר תיק חדש ב-Airtable ונכנס לטיפול המשרד.',
+      'נשלח ללקוח קישור צפייה להתקדמות התיק.',
+      'המזכירות והיועץ מקדמים את התיק דרך שמאות והצעות בנקים.',
     ],
-    sectionDocs: 'כיסוי מסמכים',
-    sectionDocsText: 'ספריית המסמכים כבר כוללת את שלד הדרישות המרכזי לעולם המשכנתאות בישראל, עם התאמה לפי סוג העסקה ופרופיל ההכנסה של הלקוח.',
-    sectionDocsCount: 'סוגי מסמכים מוגדרים כרגע',
+    coverage: 'מסמכים מוגדרים',
+    coverageText: 'רשימת המסמכים כבר כוללת את בסיס העבודה למשכנתא ומתאימה דרישות לפי סוג תיק ופרופיל הכנסה.',
   },
 };
 
@@ -68,14 +70,16 @@ export function HomePageClient({ activeCases, reviewQueue, receivedOffers, docum
 
   return (
     <div className="grid">
-      <section className="hero product-hero">
+      <section className="hero product-hero home-hero-card card">
         <div>
           <p className="eyebrow">{t.eyebrow}</p>
           <h2>{t.title}</h2>
           <p className="muted">{t.body}</p>
         </div>
-        <div className="hero-actions">
+        <div className="hero-actions home-actions-stack">
           <a className="button" href="/intake">{t.cta}</a>
+          <a className="button button-secondary" href="/login">{t.ctaSecondary}</a>
+          <a className="text-link" href="/office">{t.office}</a>
           <span className={`badge ${liveMode ? 'good' : 'warn'}`}>{liveMode ? t.statusLive : t.statusLocal}</span>
         </div>
       </section>
@@ -88,18 +92,17 @@ export function HomePageClient({ activeCases, reviewQueue, receivedOffers, docum
 
       <div className="grid cols-2">
         <section className="card">
-          <p className="eyebrow">{t.sectionValue}</p>
+          <p className="eyebrow">{t.sectionTitle}</p>
           <ul className="list">
-            {t.sectionValueItems.map((item) => (
+            {t.items.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
         </section>
         <section className="card">
-          <p className="eyebrow">{t.sectionDocs}</p>
-          <p className="muted">{t.sectionDocsText}</p>
+          <p className="eyebrow">{t.coverage}</p>
           <div className="big-number">{documentCount}</div>
-          <p className="muted">{t.sectionDocsCount}</p>
+          <p className="muted">{t.coverageText}</p>
         </section>
       </div>
     </div>

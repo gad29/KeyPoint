@@ -1,3 +1,5 @@
+import type { BankOffer, CaseStage } from '@/data/domain';
+
 export interface PortalInvite {
   token: string;
   caseId: string;
@@ -29,6 +31,20 @@ export interface CreateCaseInput {
   source?: string;
   missingItemsCount?: number;
   portalStatus?: string;
+  nextAction?: string;
+}
+
+export interface CaseUpdateInput {
+  stage?: CaseStage;
+  assignedTo?: string;
+  notesAppend?: string;
+  portalStatus?: string;
+  nextAction?: string;
+  missingItemsCount?: number;
+}
+
+export interface CreateBankOfferInput extends BankOffer {
+  caseId: string;
 }
 
 export interface ActionResult<T> {

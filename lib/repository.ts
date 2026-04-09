@@ -1,19 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { sampleCases, documentLibrary, type CaseRecord, type CaseStage } from '@/data/domain';
+import { sampleCases, sampleOffers, documentLibrary, type BankOffer, type CaseRecord, type CaseStage } from '@/data/domain';
 import { env, hasAirtableConfig } from '@/lib/env';
 import {
   createAirtableActivityLog,
+  createAirtableAiReviewStub,
+  createAirtableBankRun,
   createAirtableCase,
   createAirtableCaseDocument,
   getAirtableCaseByCaseId,
+  listAirtableBankRuns,
   listAirtableCases,
+  updateAirtableCase,
   updateAirtableCaseStage,
   updateAirtablePortalStatus,
 } from '@/lib/airtable';
-import { triggerN8n } from '@/lib/n8n';
-import type { CreateCaseInput, PortalInvite, UploadRecord } from '@/lib/types';
+import { postJson, triggerN8n } from '@/lib/n8n';
+import type { CaseUpdateInput, CreateBankOfferInput, CreateCaseInput, PortalInvite, UploadRecord } from '@/lib/types';
 
 const appRoot = process.cwd();
 const dataRoot = path.join(appRoot, 'data');
@@ -53,7 +57,7 @@ function makeInviteToken(caseRecord: CaseRecord) {
     caseId: caseRecord.id,
     leadName: caseRecord.leadName,
     phone: caseRecord.phone,
-    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
   } satisfies Omit<PortalInvite, 'token'>;
 
   const encodedPayload = base64url(JSON.stringify(payload));
@@ -78,6 +82,93 @@ function parseInviteToken(token: string): Omit<PortalInvite, 'token'> | null {
   } catch {
     return null;
   }
+}
+
+function getStageSummary(stage: CaseStage) {
+  switch (stage) {
+    case 'intake-submitted':
+    case 'approved':
+    case 'portal-activated':
+    case 'documents-in-progress':
+    case 'secretary-review':
+      return { phase: 'intake-complete', note: 'Intake and document collection are being reviewed.' };
+    case 'waiting-appraiser':
+    case 'appraisal-received':
+      return { phase: 'appraisal-property-docs', note: 'Property and appraisal work is in progress.' };
+    case 'ready-for-bank':
+    case 'bank-negotiation':
+    case 'recommendation-prepared':
+    case 'completed':
+      return { phase: 'advisor-bank-offers', note: 'Advisor and bank-offer work is underway.' };
+    default:
+      return { phase: 'intake-complete', note: 'The case has been opened and is waiting for the next action.' };
+  }
+}
+
+async function triggerOfficeAlert(kind: string, payload: Record<string, unknown>) {
+  if (env.officeAlertWebhookUrl) {
+    return postJson(env.officeAlertWebhookUrl, { kind, ...payload });
+  }
+
+  if (env.n8nWebhookBaseUrl) {
+    return triggerN8n(`keypoint/${kind}`, payload);
+  }
+
+  return { ok: false, error: 'No office alert path configured' } as const;
+}
+
+async function triggerAdvisorReady(caseRecord: CaseRecord) {
+  if (caseRecord.stage !== 'ready-for-bank') return { ok: true, skipped: true } as const;
+  return triggerOfficeAlert('advisor-ready', {
+    caseId: caseRecord.id,
+    assignedTo: caseRecord.assignedTo,
+    stage: caseRecord.stage,
+    nextAction: caseRecord.nextAction,
+  });
+}
+
+function buildAnonymizedReviewPayload(caseRecord: CaseRecord, offers: BankOffer[]) {
+  return {
+    caseId: caseRecord.id,
+    phase: getStageSummary(caseRecord.stage).phase,
+    stage: caseRecord.stage,
+    caseType: caseRecord.caseType,
+    borrowerProfiles: caseRecord.borrowerProfiles,
+    missingItems: caseRecord.missingItems,
+    assignedTo: caseRecord.assignedTo,
+    bankTargets: caseRecord.bankTargets,
+    nextAction: caseRecord.nextAction,
+    offerCount: offers.length,
+    offers: offers.map((offer) => ({
+      bank: offer.bank,
+      status: offer.status,
+      firstPayment: offer.firstPayment || '',
+      maxPayment: offer.maxPayment || '',
+      totalRepayment: offer.totalRepayment || '',
+      expiresAt: offer.expiresAt || '',
+    })),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function triggerStageReview(caseRecord: CaseRecord) {
+  const offers = await listBankOffers(caseRecord.id);
+  const payload = buildAnonymizedReviewPayload(caseRecord, offers);
+  const payloadRef = `stage-review:${caseRecord.id}:${Date.now()}`;
+
+  if (hasAirtableConfig()) {
+    await createAirtableAiReviewStub(caseRecord.id, caseRecord.stage, payloadRef);
+  }
+
+  if (env.aiReviewWebhookUrl) {
+    return postJson(env.aiReviewWebhookUrl, payload);
+  }
+
+  if (env.n8nWebhookBaseUrl) {
+    return triggerN8n('keypoint/stage-review', payload);
+  }
+
+  return { ok: false, error: 'No AI review hook configured' } as const;
 }
 
 export async function listCases(): Promise<CaseRecord[]> {
@@ -109,19 +200,49 @@ export async function createCase(input: CreateCaseInput) {
   if (!created.ok || !created.data) return created;
 
   await createAirtableActivityLog(created.data.id, 'case-created', 'Case created from KeyPoint app');
+  await triggerOfficeAlert('secretary-alert', {
+    caseId: created.data.id,
+    leadName: created.data.leadName,
+    stage: created.data.stage,
+    assignedTo: created.data.assignedTo,
+  });
   return created;
 }
 
-export async function setCaseStage(caseId: string, stage: CaseStage) {
+export async function updateCase(caseId: string, input: CaseUpdateInput) {
   if (!hasAirtableConfig()) {
-    return { ok: false, error: 'Airtable must be configured to update case stage' } as const;
+    return { ok: false, error: 'Airtable must be configured to update case data' } as const;
   }
 
-  const updated = await updateAirtableCaseStage(caseId, stage);
-  if (updated.ok) {
-    await createAirtableActivityLog(caseId, 'stage-updated', `Case stage changed to ${stage}`);
+  const updated = await updateAirtableCase(caseId, input);
+  if (!updated.ok || !updated.data) return updated;
+
+  const activityParts = [
+    input.stage ? `stage ${input.stage}` : '',
+    typeof input.assignedTo === 'string' ? `owner ${input.assignedTo}` : '',
+    typeof input.portalStatus === 'string' ? `portal ${input.portalStatus}` : '',
+    typeof input.nextAction === 'string' ? 'next action updated' : '',
+    typeof input.missingItemsCount === 'number' ? `missing items ${input.missingItemsCount}` : '',
+  ].filter(Boolean);
+
+  if (activityParts.length) {
+    await createAirtableActivityLog(caseId, 'case-updated', `Updated ${activityParts.join(', ')}`);
   }
+
+  if (input.notesAppend?.trim()) {
+    await createAirtableActivityLog(caseId, 'case-note-added', input.notesAppend.trim());
+  }
+
+  if (input.stage) {
+    await triggerStageReview(updated.data);
+    await triggerAdvisorReady(updated.data);
+  }
+
   return updated;
+}
+
+export async function setCaseStage(caseId: string, stage: CaseStage) {
+  return updateCase(caseId, { stage });
 }
 
 export async function getCaseChecklist(caseId: string) {
@@ -146,7 +267,7 @@ export async function createInvite(caseId: string): Promise<PortalInvite> {
 
   if (hasAirtableConfig()) {
     await updateAirtablePortalStatus(caseId, 'invited');
-    await createAirtableActivityLog(caseId, 'portal-invite-generated', 'Portal invite link generated');
+    await createAirtableActivityLog(caseId, 'portal-invite-generated', 'Client progress link generated');
   }
 
   return { token, ...parsed };
@@ -206,6 +327,37 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
 export async function listUploads(caseId?: string) {
   const uploads = readJson<UploadRecord[]>(uploadsFile, []);
   return caseId ? uploads.filter((item) => item.caseId === caseId) : uploads;
+}
+
+export async function listBankOffers(caseId: string): Promise<BankOffer[]> {
+  if (hasAirtableConfig()) {
+    const result = await listAirtableBankRuns(caseId);
+    if (result.ok && result.data) return result.data;
+  }
+
+  return sampleOffers;
+}
+
+export async function createBankOffer(input: CreateBankOfferInput) {
+  if (!hasAirtableConfig()) {
+    return { ok: false, error: 'Airtable must be configured to save bank offers' } as const;
+  }
+
+  const created = await createAirtableBankRun(input);
+  if (!created.ok) return created;
+
+  await createAirtableActivityLog(input.caseId, 'bank-offer-added', `Added ${input.bank} offer (${input.status})`);
+
+  const caseRecord = await getCase(input.caseId);
+  if (caseRecord) {
+    await triggerStageReview(caseRecord);
+  }
+
+  return { ok: true, data: input } as const;
+}
+
+export function getStagePresentation(stage: CaseStage) {
+  return getStageSummary(stage);
 }
 
 export function getUploadDirectory() {

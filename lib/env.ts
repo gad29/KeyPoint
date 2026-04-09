@@ -5,6 +5,8 @@ export const env = {
   airtableClientsTable: process.env.AIRTABLE_CLIENTS_TABLE || 'Clients',
   airtableDocumentsTable: process.env.AIRTABLE_DOCUMENTS_TABLE || 'Case documents',
   airtableActivityLogTable: process.env.AIRTABLE_ACTIVITY_LOG_TABLE || 'Activity log',
+  airtableBankRunsTable: process.env.AIRTABLE_BANK_RUNS_TABLE || 'Bank runs',
+  airtableAiReviewsTable: process.env.AIRTABLE_AI_REVIEWS_TABLE || 'AI reviews',
   n8nWebhookBaseUrl: process.env.N8N_WEBHOOK_BASE_URL,
   appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
   keypointAppBaseUrl: process.env.KEYPOINT_APP_BASE_URL || process.env.APP_BASE_URL || 'http://localhost:3000',

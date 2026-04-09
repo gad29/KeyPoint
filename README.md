@@ -50,10 +50,11 @@ npm run dev
 - Full guide: `docs/cloudpanel-vps-deploy.md`.
 
 ## Core routes
-- `/intake` — public native intake flow
-- `/office` — staff dashboard
-- `/portal` — client portal shell
-- `/docs` — build/integration notes
+- `/` — public welcome page
+- `/intake` — public native intake flow with post-submit document upload
+- `/progress/:token` — read-only client progress page
+- `/office` — internal staff workspace
+- `/login` — progress-token entry + office entry
 
 ## Core API routes
 - `GET /api/cases` — list cases
@@ -70,8 +71,11 @@ npm run dev
 - Native intake now creates a case row, primary client record, optional co-applicant client record, seeded case-document checklist rows, and an intake activity log in Airtable.
 - Full intake answers are still serialized into case notes for the MVP so office staff keeps the richer context even when a dedicated Airtable field does not exist yet.
 - Portal invites are signed and stateless; they no longer rely on local invite files.
+- Client progress links now resolve under `/progress/:token` and are read-only.
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
+- Office case updates persist back to Airtable, and advisor/bank offers can be written into the `Bank runs` table.
+- Stage changes now prepare anonymized review payloads for n8n / AI-review hooks without client names.
 - Native intake no longer depends on Fillout or the old intake webhook. Case creation happens directly in the app, and the n8n rebuild is being reset around Airtable-triggered post-create automation plus document-processing workflows.
 - When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
 

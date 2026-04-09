@@ -1,42 +1,83 @@
 'use client';
 
 import { useI18n } from '@/components/i18n';
-import type { CaseRecord, DocumentRequirement } from '@/data/domain';
-
-const stageCopy = {
-  en: ['Intake submitted', 'Portal activated', 'Documents in progress', 'Secretary review', 'Waiting for appraiser', 'Ready for bank work'],
-  he: ['התקבל טופס פתיחה', 'אזור הלקוח הופעל', 'איסוף מסמכים', 'בדיקת מזכירות', 'ממתין לשמאי', 'מוכן לעבודה מול הבנקים'],
-};
+import type { BankOffer, CaseRecord, DocumentRequirement } from '@/data/domain';
 
 const copy = {
   en: {
-    eyebrow: 'Client Portal',
+    eyebrow: 'Client progress',
     titlePrefix: 'Case',
-    subtitle: 'A simple bilingual space where clients can follow progress and understand what is still needed.',
-    timeline: 'Case progress',
-    stepNote: 'The office updates each stage as the case moves forward.',
-    docs: 'Required documents',
-    docsLogic: 'Why it is needed',
-    noCase: 'No case available',
-    noCaseText: 'Connect live data or add a case to display the client portal.',
+    subtitle: 'This page is read-only and updates when the office moves the case forward.',
+    noCase: 'Progress link unavailable',
+    noCaseText: 'Ask the office for a fresh progress link.',
+    currentStage: 'Current stage',
+    currentPhase: 'Current phase',
+    documents: 'Requested documents',
+    offers: 'Bank offers',
+    noOffers: 'Bank offers will appear here once the advisor logs them.',
+    intakePhase: 'Intake complete',
+    appraisalPhase: 'Appraisal / property documents',
+    advisorPhase: 'Advisor / bank offers',
   },
   he: {
-    eyebrow: 'אזור לקוחות',
+    eyebrow: 'התקדמות התיק',
     titlePrefix: 'תיק',
-    subtitle: 'אזור ברור ונעים שבו הלקוח רואה את ההתקדמות בתיק ומבין בדיוק אילו מסמכים עדיין נדרשים.',
-    timeline: 'התקדמות התיק',
-    stepNote: 'הצוות מעדכן כל שלב לפי מצב התיק בפועל.',
-    docs: 'מסמכים נדרשים',
-    docsLogic: 'למה צריך את זה',
-    noCase: 'אין כרגע תיק להצגה',
-    noCaseText: 'יש לחבר נתונים חיים או להוסיף תיק כדי להציג את אזור הלקוחות.',
+    subtitle: 'עמוד צפייה בלבד שמתעדכן כשהמשרד מקדם את התיק.',
+    noCase: 'קישור ההתקדמות לא זמין',
+    noCaseText: 'יש לבקש מהמשרד קישור התקדמות חדש.',
+    currentStage: 'שלב נוכחי',
+    currentPhase: 'השלב בתהליך',
+    documents: 'מסמכים נדרשים',
+    offers: 'הצעות בנק',
+    noOffers: 'הצעות בנק יופיעו כאן אחרי שהיועץ יזין אותן.',
+    intakePhase: 'השלמת פתיחה',
+    appraisalPhase: 'שמאות / מסמכי נכס',
+    advisorPhase: 'יועץ / הצעות בנקים',
   },
 };
 
-export function PortalPageClient({ caseRecord, requiredDocuments }: { caseRecord?: CaseRecord; requiredDocuments: DocumentRequirement[] }) {
+const stageLabels = {
+  en: {
+    'new-lead': 'New lead',
+    'intake-submitted': 'Intake complete',
+    approved: 'Approved',
+    'portal-activated': 'Progress link sent',
+    'documents-in-progress': 'Collecting documents',
+    'secretary-review': 'Secretary review',
+    'waiting-appraiser': 'Appraisal in progress',
+    'appraisal-received': 'Appraisal received',
+    'ready-for-bank': 'Ready for advisor',
+    'bank-negotiation': 'Advisor / bank offers',
+    'recommendation-prepared': 'Recommendation prepared',
+    completed: 'Completed',
+  },
+  he: {
+    'new-lead': 'ליד חדש',
+    'intake-submitted': 'הטופס הושלם',
+    approved: 'אושר',
+    'portal-activated': 'נשלח קישור התקדמות',
+    'documents-in-progress': 'איסוף מסמכים',
+    'secretary-review': 'בדיקת מזכירות',
+    'waiting-appraiser': 'שמאות בתהליך',
+    'appraisal-received': 'התקבלה שמאות',
+    'ready-for-bank': 'מוכן ליועץ',
+    'bank-negotiation': 'יועץ / הצעות בנקים',
+    'recommendation-prepared': 'הוכנה המלצה',
+    completed: 'הושלם',
+  },
+};
+
+function phaseLabel(language: 'en' | 'he', stage: CaseRecord['stage']) {
+  const t = copy[language];
+  if (stage === 'waiting-appraiser' || stage === 'appraisal-received') return t.appraisalPhase;
+  if (stage === 'ready-for-bank' || stage === 'bank-negotiation' || stage === 'recommendation-prepared' || stage === 'completed') return t.advisorPhase;
+  return t.intakePhase;
+}
+
+export function PortalPageClient({ caseRecord, requiredDocuments, offers = [] }: { caseRecord?: CaseRecord; requiredDocuments: Array<DocumentRequirement & { required?: boolean }>; offers?: BankOffer[] }) {
   const { language } = useI18n();
   const t = copy[language];
-  const stages = stageCopy[language];
+  const labels = stageLabels[language];
 
   if (!caseRecord) {
     return (
@@ -54,37 +95,57 @@ export function PortalPageClient({ caseRecord, requiredDocuments }: { caseRecord
         <p className="eyebrow">{t.eyebrow}</p>
         <h2>{caseRecord.leadName}</h2>
         <p className="muted">{t.titlePrefix} {caseRecord.id} · {t.subtitle}</p>
-        <div className="timeline" style={{ marginTop: 18 }}>
-          {stages.map((step, index) => (
-            <div key={step} className="step">
-              <strong>{index + 1}. {step}</strong>
-              <p className="muted">{t.stepNote}</p>
-            </div>
-          ))}
+        <div className="review-grid" style={{ marginTop: 18 }}>
+          <div className="review-row"><span>{t.currentPhase}</span><strong>{phaseLabel(language, caseRecord.stage)}</strong></div>
+          <div className="review-row"><span>{t.currentStage}</span><strong>{labels[caseRecord.stage]}</strong></div>
         </div>
       </section>
 
       <section className="card">
-        <p className="eyebrow">{t.docs}</p>
+        <p className="eyebrow">{t.documents}</p>
         <table className="table">
-          <thead>
-            <tr>
-              <th>{t.docs}</th>
-              <th>{t.docsLogic}</th>
-            </tr>
-          </thead>
           <tbody>
-            {requiredDocuments.map((doc) => (
+            {requiredDocuments.filter((doc) => doc.required).map((doc) => (
               <tr key={doc.code}>
                 <td>
                   <strong>{language === 'he' ? doc.labelHe : doc.labelEn}</strong>
-                  <div className="muted">{language === 'he' ? doc.labelEn : doc.labelHe}</div>
                 </td>
-                <td className="muted">{doc.description}</td>
               </tr>
             ))}
           </tbody>
         </table>
+      </section>
+
+      <section className="card" style={{ gridColumn: '1 / -1' }}>
+        <p className="eyebrow">{t.offers}</p>
+        {offers.length ? (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Bank</th>
+                <th>Status</th>
+                <th>First payment</th>
+                <th>Max payment</th>
+                <th>Total repayment</th>
+                <th>Expiry</th>
+              </tr>
+            </thead>
+            <tbody>
+              {offers.map((offer) => (
+                <tr key={`${offer.bank}-${offer.expiresAt || offer.status}`}>
+                  <td><strong>{offer.bank}</strong></td>
+                  <td>{offer.status}</td>
+                  <td>{offer.firstPayment || '-'}</td>
+                  <td>{offer.maxPayment || '-'}</td>
+                  <td>{offer.totalRepayment || '-'}</td>
+                  <td>{offer.expiresAt || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <p className="muted">{t.noOffers}</p>
+        )}
       </section>
     </div>
   );

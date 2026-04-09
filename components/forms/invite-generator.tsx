@@ -5,18 +5,20 @@ import { useI18n } from '@/components/i18n';
 
 const copy = {
   en: {
-    eyebrow: 'Client portal',
-    button: 'Create portal link',
+    eyebrow: 'Client progress link',
+    button: 'Create progress link',
     loading: 'Creating…',
-    fail: 'Failed to create invite',
+    fail: 'Failed to create link',
     unknown: 'Unknown error',
+    ready: 'Read-only link ready',
   },
   he: {
-    eyebrow: 'אזור לקוחות',
-    button: 'יצירת קישור ללקוח',
+    eyebrow: 'קישור התקדמות ללקוח',
+    button: 'יצירת קישור התקדמות',
     loading: 'יוצר קישור…',
     fail: 'לא ניתן היה ליצור קישור',
     unknown: 'שגיאה לא ידועה',
+    ready: 'קישור צפייה מוכן',
   },
 };
 
@@ -52,7 +54,7 @@ export function InviteGenerator({ caseId }: { caseId: string }) {
       <button className="button" onClick={handleCreate} disabled={loading}>
         {loading ? t.loading : t.button}
       </button>
-      {link ? <p className="muted" style={{ marginTop: 12 }}>{link}</p> : null}
+      {link ? <div style={{ marginTop: 12 }}><strong>{t.ready}</strong><p className="muted" style={{ marginTop: 8 }}>{link}</p></div> : null}
       {error ? <p style={{ color: '#ff8f8f' }}>{error}</p> : null}
     </div>
   );
