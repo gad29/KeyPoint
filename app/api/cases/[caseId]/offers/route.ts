@@ -14,13 +14,18 @@ function isOfferStatus(value: unknown): value is BankOffer['status'] {
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+  }
 
-  if (typeof body?.bank !== 'string' || !body.bank.trim()) {
+  if (typeof body.bank !== 'string' || !body.bank.trim()) {
     return NextResponse.json({ ok: false, error: 'bank is required' }, { status: 400 });
   }
 
-  if (!isOfferStatus(body?.status)) {
+  if (!isOfferStatus(body.status)) {
     return NextResponse.json({ ok: false, error: 'valid offer status is required' }, { status: 400 });
   }
 
@@ -28,10 +33,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cas
     caseId,
     bank: body.bank.trim(),
     status: body.status,
-    firstPayment: typeof body?.firstPayment === 'string' ? body.firstPayment : undefined,
-    maxPayment: typeof body?.maxPayment === 'string' ? body.maxPayment : undefined,
-    totalRepayment: typeof body?.totalRepayment === 'string' ? body.totalRepayment : undefined,
-    expiresAt: typeof body?.expiresAt === 'string' ? body.expiresAt : undefined,
+    firstPayment: typeof body.firstPayment === 'string' ? body.firstPayment : undefined,
+    maxPayment: typeof body.maxPayment === 'string' ? body.maxPayment : undefined,
+    totalRepayment: typeof body.totalRepayment === 'string' ? body.totalRepayment : undefined,
+    expiresAt: typeof body.expiresAt === 'string' ? body.expiresAt : undefined,
   });
 
   return NextResponse.json(result, { status: result.ok ? 201 : 400 });

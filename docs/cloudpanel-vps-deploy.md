@@ -164,6 +164,7 @@ Check these via curl:
 
 ```bash
 curl -I https://your-real-domain.tld/
+# List cases requires an office session cookie when OFFICE_ACCESS_CODE is set (401 without it).
 curl https://your-real-domain.tld/api/cases
 ```
 

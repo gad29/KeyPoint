@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUploadDirectory, saveUpload } from '@/lib/repository';
+import { getCase, getUploadDirectory, saveUpload } from '@/lib/repository';
 import { env } from '@/lib/env';
 
 export async function POST(req: NextRequest) {
@@ -15,7 +15,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'file, caseId and documentCode are required' }, { status: 400 });
   }
 
+  const existingCase = await getCase(caseId);
+  if (!existingCase) {
+    return NextResponse.json({ ok: false, error: 'Unknown caseId' }, { status: 404 });
+  }
+
   const bytes = Buffer.from(await file.arrayBuffer());
+  if (bytes.length === 0) {
+    return NextResponse.json({ ok: false, error: 'Empty file' }, { status: 400 });
+  }
+  if (bytes.length > env.uploadMaxFileBytes) {
+    return NextResponse.json(
+      { ok: false, error: `File too large (max ${env.uploadMaxFileBytes} bytes)` },
+      { status: 413 },
+    );
+  }
   const safeName = `${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const uploadDir = getUploadDirectory();
   fs.mkdirSync(uploadDir, { recursive: true });

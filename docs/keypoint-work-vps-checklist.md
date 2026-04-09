@@ -173,6 +173,7 @@ Browser checks:
 HTTP checks:
 ```bash
 curl -I https://keypoint.work/
+# /api/cases expects 401 without office cookie when OFFICE_ACCESS_CODE is enabled.
 curl https://keypoint.work/api/cases
 ```
 

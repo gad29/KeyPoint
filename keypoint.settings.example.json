@@ -4,7 +4,8 @@
     "portalInviteSecret": "replace-with-a-long-random-secret",
     "officeAccessCode": "",
     "officeSessionSecret": "",
-    "officeSessionHours": 12
+    "officeSessionHours": 12,
+    "n8nForwarderSecret": ""
   },
   "airtable": {
     "apiKey": "",
@@ -24,7 +25,8 @@
   "storage": {
     "mode": "local",
     "uploadDir": "./data/uploads",
-    "uploadPublicBaseUrl": ""
+    "uploadPublicBaseUrl": "",
+    "maxFileBytes": 15728640
   },
   "n8n": {
     "webhookBaseUrl": "https://n8n.example.com/webhook"

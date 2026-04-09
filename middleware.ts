@@ -2,17 +2,30 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { requestHasOfficeSession } from '@/lib/office-auth';
 
-function isProtectedOfficePath(pathname: string) {
+function isCasesListPath(pathname: string) {
+  return pathname === '/api/cases' || pathname === '/api/cases/';
+}
+
+function isProtectedOfficePath(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  const method = request.method;
+
   if (pathname.startsWith('/office')) return true;
   if (pathname.startsWith('/api/invites')) return true;
   if (/^\/api\/cases\/[^/]+(?:\/offers)?$/.test(pathname)) return true;
+
+  // Listing all cases must never be public (office UI loads data server-side; this blocks direct API scraping).
+  if (isCasesListPath(pathname) && (method === 'GET' || method === 'HEAD')) {
+    return true;
+  }
+
   return false;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
-  if (!isProtectedOfficePath(pathname)) {
+  if (!isProtectedOfficePath(request)) {
     return NextResponse.next();
   }
 

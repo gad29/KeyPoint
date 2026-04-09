@@ -71,7 +71,7 @@ In Vercel:
 - `/office` loads
 - `/portal` loads
 - `/login` loads
-- `/api/cases` returns JSON
+- `/api/cases` returns JSON when called with an **office session cookie** (or returns 401 when `OFFICE_ACCESS_CODE` is set and you are not signed in)
 - invite generation works from the office UI
 - invite links open correctly
 - upload events hit n8n successfully

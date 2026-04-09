@@ -8,6 +8,8 @@ export const env = {
   airtableBankRunsTable: process.env.AIRTABLE_BANK_RUNS_TABLE || 'Bank runs',
   airtableAiReviewsTable: process.env.AIRTABLE_AI_REVIEWS_TABLE || 'AI reviews',
   n8nWebhookBaseUrl: process.env.N8N_WEBHOOK_BASE_URL,
+  /** Shared secret for POST /api/webhooks/n8n when not using an office session (optional in local dev). */
+  n8nForwarderSecret: process.env.N8N_FORWARDER_SECRET,
   appBaseUrl: process.env.APP_BASE_URL || 'http://localhost:3000',
   keypointAppBaseUrl: process.env.KEYPOINT_APP_BASE_URL || process.env.APP_BASE_URL || 'http://localhost:3000',
   portalInviteSecret: process.env.PORTAL_INVITE_SECRET || 'change-me',
@@ -16,6 +18,12 @@ export const env = {
   officeSessionHours: process.env.OFFICE_SESSION_HOURS || '12',
   uploadDir: process.env.UPLOAD_DIR || './data/uploads',
   uploadPublicBaseUrl: process.env.UPLOAD_PUBLIC_BASE_URL,
+  uploadMaxFileBytes: (() => {
+    const raw = process.env.UPLOAD_MAX_FILE_BYTES;
+    const parsed = raw ? Number(raw) : NaN;
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+    return 15 * 1024 * 1024;
+  })(),
   officeAlertWebhookUrl: process.env.OFFICE_ALERT_WEBHOOK_URL,
   whatsappProviderWebhookUrl: process.env.WHATSAPP_PROVIDER_WEBHOOK_URL,
   smsProviderWebhookUrl: process.env.SMS_PROVIDER_WEBHOOK_URL,

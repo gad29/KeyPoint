@@ -5,6 +5,7 @@ import { createNativeIntakeCase } from '@/lib/airtable';
 import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
 import { postJson, triggerN8n } from '@/lib/n8n';
 import { env } from '@/lib/env';
+import { currentRequestHasOfficeSession } from '@/lib/office-auth';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -64,10 +65,15 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+  }
 
-  if (body?.source === 'native-intake') {
-    const intake = body?.intake;
+  if (body.source === 'native-intake') {
+    const intake = body.intake;
     if (!validateNativeIntake(intake)) {
       return NextResponse.json(
         { ok: false, error: 'Invalid intake payload. Applicant, phone, case type, income profile, and consent are required.' },
@@ -118,10 +124,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const leadName = body?.leadName as string | undefined;
-  const phone = body?.phone as string | undefined;
-  const caseType = body?.caseType as string | undefined;
-  const borrowerProfiles = parseBorrowerProfiles(body?.borrowerProfiles);
+  if (!(await currentRequestHasOfficeSession())) {
+    return NextResponse.json({ ok: false, error: 'Office authentication required' }, { status: 401 });
+  }
+
+  const leadName = body.leadName as string | undefined;
+  const phone = body.phone as string | undefined;
+  const caseType = body.caseType as string | undefined;
+  const borrowerProfiles = parseBorrowerProfiles(body.borrowerProfiles);
 
   if (!leadName || !phone || !caseType || !borrowerProfiles.length) {
     return NextResponse.json(
@@ -132,17 +142,17 @@ export async function POST(req: NextRequest) {
 
   const result = await createCase({
     leadName,
-    spouseName: body?.spouseName ? String(body.spouseName) : undefined,
+    spouseName: body.spouseName ? String(body.spouseName) : undefined,
     phone,
-    email: body?.email ? String(body.email) : undefined,
+    email: body.email ? String(body.email) : undefined,
     caseType,
     borrowerProfiles,
-    assignedTo: body?.assignedTo ? String(body.assignedTo) : undefined,
-    notes: body?.notes ? String(body.notes) : undefined,
-    submissionId: body?.submissionId ? String(body.submissionId) : undefined,
-    stage: body?.stage ? String(body.stage) : undefined,
-    source: body?.source ? String(body.source) : undefined,
-    nextAction: body?.nextAction ? String(body.nextAction) : undefined,
+    assignedTo: body.assignedTo ? String(body.assignedTo) : undefined,
+    notes: body.notes ? String(body.notes) : undefined,
+    submissionId: body.submissionId ? String(body.submissionId) : undefined,
+    stage: body.stage ? String(body.stage) : undefined,
+    source: body.source ? String(body.source) : undefined,
+    nextAction: body.nextAction ? String(body.nextAction) : undefined,
   });
 
   return NextResponse.json(result, { status: result.ok ? 201 : 400 });

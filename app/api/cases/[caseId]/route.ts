@@ -14,16 +14,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ cas
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;
-  const body = await req.json();
-  const stage = body?.stage as CaseStage | undefined;
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const stage = body.stage as CaseStage | undefined;
 
   const result = await updateCase(caseId, {
     stage,
-    assignedTo: typeof body?.assignedTo === 'string' ? body.assignedTo : undefined,
-    notesAppend: typeof body?.notesAppend === 'string' ? body.notesAppend : undefined,
-    portalStatus: typeof body?.portalStatus === 'string' ? body.portalStatus : undefined,
-    nextAction: typeof body?.nextAction === 'string' ? body.nextAction : undefined,
-    missingItemsCount: typeof body?.missingItemsCount === 'number' ? body.missingItemsCount : undefined,
+    assignedTo: typeof body.assignedTo === 'string' ? body.assignedTo : undefined,
+    notesAppend: typeof body.notesAppend === 'string' ? body.notesAppend : undefined,
+    portalStatus: typeof body.portalStatus === 'string' ? body.portalStatus : undefined,
+    nextAction: typeof body.nextAction === 'string' ? body.nextAction : undefined,
+    missingItemsCount: typeof body.missingItemsCount === 'number' ? body.missingItemsCount : undefined,
   });
 
   return NextResponse.json(result, { status: result.ok ? 200 : 400 });

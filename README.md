@@ -58,13 +58,18 @@ npm run dev
 - `/login` — progress-token entry + office entry
 
 ## Core API routes
-- `GET /api/cases` — list cases
-- `POST /api/cases` — create a live case in Airtable or submit a native intake payload
-- `GET /api/cases/:caseId` — fetch a case
-- `PATCH /api/cases/:caseId` — update case stage
-- `POST /api/invites` — generate a signed invite link
-- `POST /api/uploads` — save an upload and forward the event to n8n
-- `POST /api/webhooks/n8n` — generic n8n forwarder
+- `GET /api/cases` — list cases (**office session** or disabled office mode)
+- `POST /api/cases` — native intake (`source: native-intake`) is public; other creates require **office session**
+- `GET /api/cases/:caseId` — fetch a case (**office session** or disabled office mode)
+- `PATCH /api/cases/:caseId` — update case stage (**office session** or disabled office mode)
+- `POST /api/invites` — generate a signed invite link (**office session** or disabled office mode)
+- `POST /api/uploads` — save an upload and forward the event to n8n (requires a real `caseId`; size limit `UPLOAD_MAX_FILE_BYTES`, default 15 MiB)
+- `POST /api/webhooks/n8n` — generic n8n forwarder (**office session**, or `x-keypoint-forwarder-secret` when `N8N_FORWARDER_SECRET` is set; in production with a live app URL, anonymous calls are rejected unless one of these applies)
+
+## API hardening notes
+- Set `OFFICE_ACCESS_CODE` in production before exposing `/office` or internal APIs (see middleware).
+- Set `N8N_FORWARDER_SECRET` for server-to-server or n8n HTTP nodes that call `/api/webhooks/n8n` without a browser cookie.
+- Set `PORTAL_INVITE_SECRET` to a long random value before issuing client progress links.
 
 ## Current operational model
 - Cases load from Airtable when configured, otherwise sample data is used.

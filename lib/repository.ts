@@ -42,7 +42,15 @@ function readJson<T>(filePath: string, fallback: T): T {
 
 function writeJson(filePath: string, value: unknown) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(value, null, 2));
+  const serialized = JSON.stringify(value, null, 2);
+  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, serialized);
+  try {
+    fs.renameSync(tmp, filePath);
+  } catch {
+    fs.copyFileSync(tmp, filePath);
+    fs.unlinkSync(tmp);
+  }
 }
 
 function base64url(input: string) {
