@@ -36,7 +36,7 @@ export function HomePageClient() {
           <Link className="button button-landing" href="/intake">
             {t.cta}
           </Link>
-          <Link className="button button-secondary button-landing-outline" href="/login?next=/office">
+          <Link className="button button-secondary button-landing-outline" href="/login?next=/office/active">
             {t.staff}
           </Link>
         </div>

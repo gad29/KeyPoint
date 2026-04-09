@@ -4,11 +4,13 @@ import { useMemo, useState } from 'react';
 import { InviteGenerator } from '@/components/forms/invite-generator';
 import { useI18n } from '@/components/i18n';
 import type { BankOffer, CaseRecord, CaseStage } from '@/data/domain';
+import { officeCaseBucket, type OfficeCaseBucket } from '@/lib/office-buckets';
 
 type OfficePageClientProps = {
   cases: CaseRecord[];
   offersByCase: Record<string, BankOffer[]>;
   liveMode: boolean;
+  bucket: OfficeCaseBucket;
 };
 
 const stageOptions: CaseStage[] = [
@@ -81,6 +83,15 @@ const copy = {
     add: 'Add offer',
     adding: 'Adding…',
     noCases: 'No cases available.',
+    emptyActive: 'No cases in this folder.',
+    emptyStuck: 'No blocked cases (missing items = 0 for all open files).',
+    emptyCompleted: 'No completed cases yet.',
+    activeTitle: 'In progress',
+    activeBody: 'Open cases with nothing missing on the checklist count.',
+    stuckTitle: 'Blocked',
+    stuckBody: 'Cases with missing documents or items (count > 0). Set count to 0 to move back to In progress.',
+    completedTitle: 'Done',
+    completedBody: 'Cases marked completed.',
     phase: 'Workflow phase',
     offers: 'Offers',
     signOut: 'Sign out',
@@ -118,6 +129,15 @@ const copy = {
     add: 'הוספת הצעה',
     adding: 'מוסיף…',
     noCases: 'אין כרגע תיקים להצגה.',
+    emptyActive: 'אין תיקים בתיקייה זו.',
+    emptyStuck: 'אין תיקים תקועים (אין תיקים פתוחים עם מספר חסרים גדול מ-0).',
+    emptyCompleted: 'עדיין אין תיקים שהושלמו.',
+    activeTitle: 'בתהליך',
+    activeBody: 'תיקים פתוחים ללא פריטים חסרים במונה.',
+    stuckTitle: 'תקועים',
+    stuckBody: 'תיקים עם מסמכים או פריטים חסרים (מונה > 0). אפסו את המונה כדי להחזיר ל״בתהליך״.',
+    completedTitle: 'הושלמו',
+    completedBody: 'תיקים בשלב הושלם.',
     phase: 'שלב בתהליך',
     offers: 'הצעות',
     signOut: 'התנתקות',
@@ -139,9 +159,25 @@ function phaseLabel(language: 'en' | 'he', stage: CaseStage) {
   return t.intakePhase;
 }
 
-export function OfficePageClient({ cases, offersByCase, liveMode }: OfficePageClientProps) {
+function bucketCopyFor(
+  language: 'en' | 'he',
+  bucket: OfficeCaseBucket,
+): { title: string; body: string; empty: string } {
+  const t = copy[language];
+  switch (bucket) {
+    case 'active':
+      return { title: t.activeTitle, body: t.activeBody, empty: t.emptyActive };
+    case 'stuck':
+      return { title: t.stuckTitle, body: t.stuckBody, empty: t.emptyStuck };
+    case 'completed':
+      return { title: t.completedTitle, body: t.completedBody, empty: t.emptyCompleted };
+  }
+}
+
+export function OfficePageClient({ cases, offersByCase, liveMode, bucket }: OfficePageClientProps) {
   const { language } = useI18n();
   const t = copy[language];
+  const bc = bucketCopyFor(language, bucket);
   const labels = stageLabels[language];
 
   async function signOut() {
@@ -182,7 +218,12 @@ export function OfficePageClient({ cases, offersByCase, liveMode }: OfficePageCl
     setSaving(false);
 
     if (json.ok && json.data) {
-      setLocalCases((current) => current.map((item) => (item.id === selectedCase.id ? json.data : item)));
+      const nextRecord = json.data as CaseRecord;
+      const staysInBucket = officeCaseBucket(nextRecord) === bucket;
+      const mapped = localCases.map((item) => (item.id === selectedCase.id ? nextRecord : item));
+      const nextList = staysInBucket ? mapped : mapped.filter((item) => item.id !== selectedCase.id);
+      setLocalCases(nextList);
+      setSelectedCaseId((prev) => (nextList.some((c) => c.id === prev) ? prev : nextList[0]?.id ?? ''));
       setSaveStatus(t.statusSaved);
       event.currentTarget.reset();
       return;
@@ -213,7 +254,25 @@ export function OfficePageClient({ cases, offersByCase, liveMode }: OfficePageCl
   }
 
   if (!localCases.length) {
-    return <section className="card"><h2>{t.noCases}</h2></section>;
+    return (
+      <div className="grid">
+        <section className="card pipeline-strip">
+          <p className="eyebrow">{t.pipeline}</p>
+          <ol className="pipeline-list">
+            <li>{t.p1}</li>
+            <li>{t.p2}</li>
+            <li>{t.p3}</li>
+          </ol>
+        </section>
+        <section className="card">
+          <p className="eyebrow">{bc.title}</p>
+          <h2>{bc.empty}</h2>
+          <button className="button button-secondary" type="button" onClick={signOut}>
+            {t.signOut}
+          </button>
+        </section>
+      </div>
+    );
   }
 
   return (
@@ -229,8 +288,8 @@ export function OfficePageClient({ cases, offersByCase, liveMode }: OfficePageCl
       <section className="hero product-hero">
         <div>
           <p className="eyebrow">{t.eyebrow}</p>
-          <h2>{t.title}</h2>
-          <p className="muted">{t.body}</p>
+          <h2>{bc.title}</h2>
+          <p className="muted">{bc.body}</p>
         </div>
         <div className="inline-actions">
           <span className={`badge ${liveMode ? 'good' : 'warn'}`}>{liveMode ? t.live : t.local}</span>

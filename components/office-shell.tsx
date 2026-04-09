@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { LanguageSwitch, useI18n } from '@/components/i18n';
 
 const nav = [
-  { href: '/office', label: { en: 'Workspace', he: 'עבודה' } },
+  { href: '/office/active', label: { en: 'In progress', he: 'בתהליך' } },
+  { href: '/office/stuck', label: { en: 'Blocked', he: 'תקועים' } },
+  { href: '/office/completed', label: { en: 'Done', he: 'הושלמו' } },
   { href: '/docs', label: { en: 'Docs', he: 'מסמכים' } },
   { href: '/connections', label: { en: 'Status', he: 'חיבורים' } },
   { href: '/', label: { en: 'Client site', he: 'אתר לקוחות' } },
@@ -27,6 +30,7 @@ const shellCopy = {
 export function OfficeFrame({ children }: { children: ReactNode }) {
   const { language, dir } = useI18n();
   const copy = shellCopy[language];
+  const pathname = usePathname();
 
   return (
     <div className="shell" dir={dir}>
@@ -42,11 +46,14 @@ export function OfficeFrame({ children }: { children: ReactNode }) {
           </div>
         </div>
         <nav className="nav">
-          {nav.map((item) => (
-            <Link key={item.href} href={item.href as never}>
-              {item.label[language]}
-            </Link>
-          ))}
+          {nav.map((item) => {
+            const active = pathname === item.href;
+            return (
+              <Link key={item.href} href={item.href as never} className={active ? 'active' : undefined}>
+                {item.label[language]}
+              </Link>
+            );
+          })}
         </nav>
       </aside>
       <main className="content">{children}</main>

@@ -24,7 +24,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
             {t.home}
           </Link>
           <LanguageSwitch />
-          <Link href="/login?next=/office" className="button button-compact">
+          <Link href="/login?next=/office/active" className="button button-compact">
             {t.staff}
           </Link>
         </div>

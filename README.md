@@ -54,7 +54,10 @@ npm run dev
 - `/` — public welcome page
 - `/intake` — public native intake flow with post-submit document upload
 - `/progress/:token` — read-only client progress page
-- `/office` — internal staff workspace
+- `/office` → redirects to `/office/active`
+- `/office/active` — open cases, no missing checklist count
+- `/office/stuck` — open cases with `missingItems > 0`
+- `/office/completed` — stage `completed`
 - `/login` — progress-token entry + office entry
 
 ## Core API routes

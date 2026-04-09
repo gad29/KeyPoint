@@ -8,7 +8,7 @@ type LoginFormProps = {
   nextPath?: string;
 };
 
-export function LoginForm({ officeAuthEnabled, nextPath = '/office' }: LoginFormProps) {
+export function LoginForm({ officeAuthEnabled, nextPath = '/office/active' }: LoginFormProps) {
   const [token, setToken] = useState('');
   const [officeCode, setOfficeCode] = useState('');
   const [officeError, setOfficeError] = useState('');

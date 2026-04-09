@@ -27,7 +27,8 @@ button, input, select, textarea { font: inherit; }
 .content { padding: 28px; }
 .nav { display: grid; gap: 10px; margin-top: 24px; }
 .nav a, .pill { padding: 10px 12px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }
-.nav a:hover, .pill:hover { transform: translateY(-1px); border-color: rgba(124,156,255,0.32); }
+.nav a:hover, .pill:hover { transform: translateY(-1px); border-color: rgba(56,189,248,0.35); }
+.nav a.active { border-color: rgba(56,189,248,0.55); background: var(--panel-3); color: var(--text); }
 .mini-link, .text-link { color: var(--accent-strong); font-weight: 600; }
 .mini-link:hover, .text-link:hover { color: white; }
 .language-switch { display: inline-flex; width: fit-content; background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 999px; padding: 4px; gap: 4px; }
