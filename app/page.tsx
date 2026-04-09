@@ -3,6 +3,8 @@ import { documentLibrary } from '@/data/domain';
 import { hasAirtableConfig } from '@/lib/env';
 import { listBankOffers, listCases } from '@/lib/repository';
 
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const cases = await listCases();
   const activeCases = cases.length.toString();

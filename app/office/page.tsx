@@ -2,6 +2,8 @@ import { OfficePageClient } from '@/components/office-page';
 import { hasAirtableConfig } from '@/lib/env';
 import { listBankOffers, listCases } from '@/lib/repository';
 
+export const dynamic = 'force-dynamic';
+
 export default async function OfficePage() {
   const cases = await listCases();
   const offersByCase = Object.fromEntries(

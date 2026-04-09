@@ -1,8 +1,12 @@
 node_modules
 .next
 .vercel
+.env
+!.env.example
+!.env.production.example
 .env.local
 .env.*.local
+n8n/.env
 keypoint.settings.json
 generated/
 n8n/.env.generated
