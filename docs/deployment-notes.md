@@ -76,5 +76,6 @@ In Vercel:
 
 ## Remaining caveats
 - Vercel local disk is not durable storage; use a proper storage path if uploads matter in production
+- A VPS with local disk is better for the current upload model, but uploads are still only as durable as that server unless you add backups/object storage
 - Some third-party services still require manual credential entry or OAuth consent on their own platform
 - Real auth beyond invite-token access is still a future hardening item

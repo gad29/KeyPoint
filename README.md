@@ -37,10 +37,17 @@ npm run dev
 ```
 
 ## Deploy
+### Vercel
 - Put the values from `generated/vercel.env` into Vercel project env vars, or paste them directly from that file.
 - Put the values from `n8n/.env.generated` into your n8n environment.
 - Import the workflows from `n8n/workflows/`.
 - Confirm Airtable field names match `docs/airtable-schema.md`.
+
+### Self-hosted VPS / CloudPanel
+- Copy `.env.production.example` to `.env.production.local`, or generate it via `npm run apply-settings`.
+- Build with `npm run build`.
+- Start with `pm2 start ecosystem.config.cjs`.
+- Full guide: `docs/cloudpanel-vps-deploy.md`.
 
 ## Core routes
 - `/intake` — public native intake flow
