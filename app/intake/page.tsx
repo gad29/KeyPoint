@@ -3,7 +3,7 @@ import { IntakeHero } from '@/components/intake-hero';
 
 export default function IntakePage() {
   return (
-    <div className="grid">
+    <div className="intake-flow-wide grid" style={{ gap: 20 }}>
       <IntakeHero />
       <IntakeForm />
     </div>

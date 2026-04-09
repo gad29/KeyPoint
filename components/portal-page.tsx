@@ -7,7 +7,7 @@ const copy = {
   en: {
     eyebrow: 'Client progress',
     titlePrefix: 'Case',
-    subtitle: 'This page is read-only and updates when the office moves the case forward.',
+    subtitle: 'Read-only. Updates when your file moves forward.',
     noCase: 'Progress link unavailable',
     noCaseText: 'Ask the office for a fresh progress link.',
     currentStage: 'Current stage',
@@ -22,7 +22,7 @@ const copy = {
   he: {
     eyebrow: 'התקדמות התיק',
     titlePrefix: 'תיק',
-    subtitle: 'עמוד צפייה בלבד שמתעדכן כשהמשרד מקדם את התיק.',
+    subtitle: 'צפייה בלבד. מתעדכן כשהתיק מתקדם.',
     noCase: 'קישור ההתקדמות לא זמין',
     noCaseText: 'יש לבקש מהמשרד קישור התקדמות חדש.',
     currentStage: 'שלב נוכחי',

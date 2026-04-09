@@ -66,11 +66,6 @@ npm run dev
 - `POST /api/uploads` — save an upload and forward the event to n8n (requires a real `caseId`; size limit `UPLOAD_MAX_FILE_BYTES`, default 15 MiB)
 - `POST /api/webhooks/n8n` — generic n8n forwarder (**office session**, or `x-keypoint-forwarder-secret` when `N8N_FORWARDER_SECRET` is set; in production with a live app URL, anonymous calls are rejected unless one of these applies)
 
-## API hardening notes
-- Set `OFFICE_ACCESS_CODE` in production before exposing `/office` or internal APIs (see middleware).
-- Set `N8N_FORWARDER_SECRET` for server-to-server or n8n HTTP nodes that call `/api/webhooks/n8n` without a browser cookie.
-- Set `PORTAL_INVITE_SECRET` to a long random value before issuing client progress links.
-
 ## Current operational model
 - Cases load from Airtable when configured, otherwise sample data is used.
 - Native intake submits to `POST /api/cases` with `source: 'native-intake'` and generates an internal submission ID for traceability.
@@ -81,7 +76,7 @@ npm run dev
 - Uploads still default to local disk unless you route them onward through your automation/storage path.
 - Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
 - Office case updates persist back to Airtable, and advisor/bank offers can be written into the `Bank runs` table.
-- Stage changes now prepare anonymized review payloads for n8n / AI-review hooks without client names.
+- Stage changes send anonymized payloads to n8n (`keypoint/stage-review`). New bank offers also trigger `keypoint/offer-comparison`. See `docs/n8n-webhook-paths.md`.
 - Native intake no longer depends on Fillout or the old intake webhook. Case creation happens directly in the app, and the n8n rebuild is being reset around Airtable-triggered post-create automation plus document-processing workflows.
 - When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
 

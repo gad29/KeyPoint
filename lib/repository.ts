@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { sampleCases, sampleOffers, documentLibrary, type BankOffer, type CaseRecord, type CaseStage } from '@/data/domain';
-import { env, hasAirtableConfig } from '@/lib/env';
+import { env, hasAirtableConfig, hasN8nConfig } from '@/lib/env';
 import {
   createAirtableActivityLog,
   createAirtableAiReviewStub,
@@ -162,6 +162,23 @@ function buildAnonymizedReviewPayload(caseRecord: CaseRecord, offers: BankOffer[
     })),
     generatedAt: new Date().toISOString(),
   };
+}
+
+async function triggerOfferComparison(caseId: string) {
+  if (!hasN8nConfig()) return { ok: false, error: 'skip' } as const;
+  const offers = await listBankOffers(caseId);
+  return triggerN8n('keypoint/offer-comparison', {
+    caseId,
+    offerCount: offers.length,
+    offers: offers.map((o) => ({
+      bank: o.bank,
+      status: o.status,
+      firstPayment: o.firstPayment || '',
+      maxPayment: o.maxPayment || '',
+      totalRepayment: o.totalRepayment || '',
+      expiresAt: o.expiresAt || '',
+    })),
+  });
 }
 
 async function triggerStageReview(caseRecord: CaseRecord) {
@@ -421,6 +438,11 @@ export async function createBankOffer(input: CreateBankOfferInput) {
         error: reviewResult.error,
       });
     }
+  }
+
+  const compareResult = await triggerOfferComparison(input.caseId);
+  if (!compareResult.ok && compareResult.error !== 'skip') {
+    logRepository('warn', 'Offer comparison webhook failed', { caseId: input.caseId, error: compareResult.error });
   }
 
   return { ok: true, data: input } as const;

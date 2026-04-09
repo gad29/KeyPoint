@@ -18,10 +18,9 @@ Make sure you have:
 - the real production values for Airtable, n8n, Twilio/email/webhooks, and `PORTAL_INVITE_SECRET`
 
 ## 1) Prepare the repo locally before pushing
-From the app folder:
+From the repo root:
 
 ```bash
-cd apps/keypoint
 npm install
 npm run build
 ```
@@ -65,7 +64,7 @@ A clean layout that is easy to redeploy:
 mkdir -p /home/<site-user>/htdocs/<domain>/repo
 cd /home/<site-user>/htdocs/<domain>/repo
 git clone <YOUR_GITHUB_REPO_URL> .
-cd apps/keypoint
+# App root is the repo root (package.json here).
 ```
 
 If the repo is private, use whichever Git auth method you already trust on that VPS.
@@ -184,7 +183,6 @@ On the server:
 ```bash
 cd /home/<site-user>/htdocs/<domain>/repo
 git pull
-cd apps/keypoint
 npm ci
 npm run build
 pm2 restart keypoint

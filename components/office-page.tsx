@@ -57,9 +57,9 @@ const stageLabels = {
 
 const copy = {
   en: {
-    eyebrow: 'Office workspace',
-    title: 'Secretary queue, appraisal work, and bank offers in one place.',
-    body: 'Update the case, generate a client progress link, and keep Airtable in sync from one internal screen.',
+    eyebrow: 'Office',
+    title: 'Cases & stages',
+    body: 'Update stages, notes, and client links. Syncs to Airtable.',
     live: 'Live workspace',
     local: 'Preview workspace',
     cases: 'Cases',
@@ -88,11 +88,15 @@ const copy = {
     intakePhase: 'Intake complete',
     appraisalPhase: 'Appraisal / property docs',
     advisorPhase: 'Advisor / bank offers',
+    pipeline: 'Pipeline',
+    p1: 'Intake & documents (secretary)',
+    p2: 'Property & appraiser',
+    p3: 'Advisor & bank offers',
   },
   he: {
-    eyebrow: 'מסך משרד',
-    title: 'תור מזכירות, שמאות והצעות בנקים במקום אחד.',
-    body: 'מעדכנים את התיק, מייצרים קישור התקדמות ללקוח ושומרים הכול ב-Airtable מתוך מסך פנימי אחד.',
+    eyebrow: 'משרד',
+    title: 'תיקים ושלבים',
+    body: 'עדכון שלבים, הערות וקישור ללקוח. מסתנכרן ל-Airtable.',
     live: 'סביבת עבודה חיה',
     local: 'מצב תצוגה',
     cases: 'תיקים',
@@ -121,6 +125,10 @@ const copy = {
     intakePhase: 'השלמת פתיחה',
     appraisalPhase: 'שמאות / מסמכי נכס',
     advisorPhase: 'יועץ / הצעות בנקים',
+    pipeline: 'תהליך',
+    p1: 'פתיחה ומסמכים — מזכירות',
+    p2: 'נכס ושמאות',
+    p3: 'יועץ והצעות בנקים',
   },
 };
 
@@ -210,6 +218,14 @@ export function OfficePageClient({ cases, offersByCase, liveMode }: OfficePageCl
 
   return (
     <div className="grid">
+      <section className="card pipeline-strip">
+        <p className="eyebrow">{t.pipeline}</p>
+        <ol className="pipeline-list">
+          <li>{t.p1}</li>
+          <li>{t.p2}</li>
+          <li>{t.p3}</li>
+        </ol>
+      </section>
       <section className="hero product-hero">
         <div>
           <p className="eyebrow">{t.eyebrow}</p>

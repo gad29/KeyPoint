@@ -12,15 +12,15 @@ type Lang = 'en' | 'he';
 type StepDefinition = { key: StepKey; label: Record<Lang, string>; title: Record<Lang, string>; description: Record<Lang, string> };
 
 const steps: StepDefinition[] = [
-  { key: 'applicant', label: { en: 'Applicant', he: 'לווה ראשי' }, title: { en: 'Tell us who is applying', he: 'מי מגיש את הבקשה?' }, description: { en: 'Start with the main applicant so we can open the case correctly.', he: 'נתחיל בפרטי הלווה הראשי כדי לפתוח את התיק בצורה נכונה.' } },
-  { key: 'coApplicant', label: { en: 'Co-applicant', he: 'לווה נוסף' }, title: { en: 'Add spouse or co-applicant details', he: 'פרטי בן/בת זוג או לווה נוסף' }, description: { en: 'Include a second borrower only if they are part of the mortgage file.', he: 'יש למלא פרטי לווה נוסף רק אם הוא חלק מהתיק בפועל.' } },
-  { key: 'contact', label: { en: 'Contact', he: 'יצירת קשר' }, title: { en: 'How should the office reach you?', he: 'איך נוח ליצור איתכם קשר?' }, description: { en: 'Choose the preferred way for the office to follow up.', he: 'בחרו את הדרך המועדפת להמשך טיפול ויצירת קשר.' } },
-  { key: 'caseType', label: { en: 'Case type', he: 'סוג תיק' }, title: { en: 'What kind of mortgage case is this?', he: 'מה סוג התיק?' }, description: { en: 'The case type determines workflow and document requirements.', he: 'סוג התיק קובע את תהליך העבודה ואת רשימת המסמכים הנדרשת.' } },
-  { key: 'income', label: { en: 'Income', he: 'הכנסות' }, title: { en: 'Describe the income profile', he: 'מה פרופיל ההכנסות?' }, description: { en: 'Select every income profile that applies.', he: 'יש לבחור את כל סוגי ההכנסה הרלוונטיים לתיק.' } },
-  { key: 'property', label: { en: 'Property', he: 'נכס' }, title: { en: 'Add the property and financing picture', he: 'פרטי הנכס והתמונה המימונית' }, description: { en: 'A first estimate is enough at this stage.', he: 'בשלב זה מספיק למלא הערכה ראשונית.' } },
-  { key: 'liabilities', label: { en: 'Liabilities', he: 'התחייבויות' }, title: { en: 'List existing obligations', he: 'האם קיימות התחייבויות נוספות?' }, description: { en: 'Current loans help us assess affordability.', he: 'מידע על הלוואות קיימות עוזר לנו להעריך יכולת החזר.' } },
-  { key: 'consent', label: { en: 'Consent', he: 'אישורים' }, title: { en: 'Confirm consent and authorization', he: 'אישור שימוש במידע והמשך טיפול' }, description: { en: 'We need these confirmations before work begins.', he: 'נדרשים אישורים אלה לפני שניתן להתחיל טיפול בתיק.' } },
-  { key: 'review', label: { en: 'Review', he: 'סקירה' }, title: { en: 'Review before submitting', he: 'בדיקה לפני שליחה' }, description: { en: 'One final pass before the office receives the intake.', he: 'מומלץ לעבור על הפרטים לפני שליחת הטופס למשרד.' } },
+  { key: 'applicant', label: { en: 'Applicant', he: 'לווה ראשי' }, title: { en: 'Main applicant', he: 'לווה ראשי' }, description: { en: 'Full name and ID details.', he: 'שם מלא ופרטי זיהוי.' } },
+  { key: 'coApplicant', label: { en: 'Co-applicant', he: 'לווה נוסף' }, title: { en: 'Second borrower', he: 'לווה נוסף' }, description: { en: 'Only if part of the mortgage.', he: 'רק אם רלוונטי לתיק.' } },
+  { key: 'contact', label: { en: 'Contact', he: 'יצירת קשר' }, title: { en: 'Contact', he: 'יצירת קשר' }, description: { en: 'Phone and preferred channel.', he: 'טלפון ודרך קשר.' } },
+  { key: 'caseType', label: { en: 'Case type', he: 'סוג תיק' }, title: { en: 'Case type', he: 'סוג תיק' }, description: { en: 'Purchase, refinance, etc.', he: 'רכישה, מיחזור וכו׳.' } },
+  { key: 'income', label: { en: 'Income', he: 'הכנסות' }, title: { en: 'Income', he: 'הכנסות' }, description: { en: 'Select all that apply.', he: 'סמנו את כל הרלוונטי.' } },
+  { key: 'property', label: { en: 'Property', he: 'נכס' }, title: { en: 'Property', he: 'נכס' }, description: { en: 'Rough numbers are fine.', he: 'מספיקה הערכה.' } },
+  { key: 'liabilities', label: { en: 'Liabilities', he: 'התחייבויות' }, title: { en: 'Loans & debt', he: 'הלוואות' }, description: { en: 'Existing monthly obligations.', he: 'התחייבויות חודשיות.' } },
+  { key: 'consent', label: { en: 'Consent', he: 'אישורים' }, title: { en: 'Consent', he: 'אישורים' }, description: { en: 'Required to process your file.', he: 'נדרש לטיפול בתיק.' } },
+  { key: 'review', label: { en: 'Review', he: 'סקירה' }, title: { en: 'Review & send', he: 'סקירה ושליחה' }, description: { en: 'Check and submit.', he: 'בדיקה ושליחה.' } },
 ];
 
 const initialState: IntakePayload = {
@@ -53,13 +53,13 @@ const copy = {
     submitFailShort: 'Failed to submit intake',
     successEyebrow: 'Case received',
     successTitle: 'Your case was received successfully',
-    successBody: 'The office can now review the file, continue follow-up, and prepare the next steps.',
+    successBody: 'We will contact you. You can upload documents below.',
     caseId: 'Case ID',
     submissionId: 'Submission ID',
     source: 'Source',
     startAnother: 'Start another case',
     uploadNow: 'Upload first documents',
-    uploadNowNote: 'You can attach the first files now. The office can keep updating the case afterward.',
+    uploadNowNote: 'PDF or photos — clear and readable.',
     of: 'of',
     fullName: 'Full name *',
     idNumber: 'ID number',
@@ -96,15 +96,12 @@ const copy = {
     accuracy: 'I confirm the information is accurate to the best of my knowledge.',
     accuracyNote: 'Details can still be updated later with the office.',
     notes: 'Anything else the advisor should know?',
-    ready: 'Ready to submit',
-    readyNote: 'Submitting this form creates the case directly in KeyPoint.',
     back: 'Back',
     continue: 'Continue',
     submitting: 'Submitting…',
     submit: 'Submit case',
-    nextSteps: 'What happens next',
-    nextStepsItems: ['A case is created in KeyPoint.', 'The office reviews the file and updates the next step.', 'You receive follow-up regarding documents and progress.'],
     reviewSummary: 'Summary before sending',
+    reviewHint: 'Submit opens your file with the office.',
   },
   he: {
     nativeIntake: 'פתיחת תיק חדש',
@@ -123,13 +120,13 @@ const copy = {
     submitFailShort: 'לא ניתן היה לשלוח את הטופס',
     successEyebrow: 'התיק התקבל',
     successTitle: 'הבקשה נקלטה בהצלחה',
-    successBody: 'המשרד יכול כעת לבדוק את התיק, להמשיך בטיפול ולהכין את השלבים הבאים.',
+    successBody: 'נחזור אליכם. אפשר להעלות מסמכים למטה.',
     caseId: 'מספר תיק',
     submissionId: 'מספר שליחה',
     source: 'מקור',
     startAnother: 'פתיחת תיק נוסף',
     uploadNow: 'העלאת מסמכים ראשונים',
-    uploadNowNote: 'אפשר לצרף כבר עכשיו את הקבצים הראשונים. המשרד ימשיך לעדכן את התיק בהמשך.',
+    uploadNowNote: 'PDF או צילומים — ברורים וקריאים.',
     of: 'מתוך',
     fullName: 'שם מלא *',
     idNumber: 'תעודת זהות',
@@ -166,15 +163,12 @@ const copy = {
     accuracy: 'אני מאשר/ת שהפרטים שמסרתי נכונים ככל הידוע לי.',
     accuracyNote: 'אפשר לעדכן פרטים בהמשך מול המשרד במידת הצורך.',
     notes: 'יש משהו נוסף שחשוב שנדע?',
-    ready: 'מוכן לשליחה',
-    readyNote: 'שליחת הטופס יוצרת את התיק ישירות בתוך KeyPoint.',
     back: 'חזרה',
     continue: 'המשך',
     submitting: 'שולח…',
     submit: 'שליחת תיק',
-    nextSteps: 'מה קורה אחרי השליחה',
-    nextStepsItems: ['נפתח תיק חדש במערכת KeyPoint.', 'המשרד בודק את הפרטים ומעדכן את השלב הבא.', 'תקבלו המשך טיפול לגבי מסמכים והתקדמות התיק.'],
     reviewSummary: 'סיכום לפני שליחה',
+    reviewHint: 'השליחה פותחת את התיק מול המשרד.',
   },
 };
 
@@ -284,7 +278,7 @@ export function IntakeForm() {
 
   if (success) {
     return (
-      <div className="grid" dir={dir}>
+      <div className="intake-flow-wide grid" dir={dir} style={{ gap: 20 }}>
         <section className="card intake-success-card">
           <span className="success-mark">✓</span>
           <p className="eyebrow">{t.successEyebrow}</p>
@@ -293,14 +287,11 @@ export function IntakeForm() {
           <div className="review-grid compact">
             <div className="review-row"><span>{t.caseId}</span><strong>{success.caseId}</strong></div>
             <div className="review-row"><span>{t.submissionId}</span><strong>{success.submissionId}</strong></div>
-            <div className="review-row"><span>{t.source}</span><strong>{success.intakeSource}</strong></div>
           </div>
           <div className="inline-actions">
             <button className="button" type="button" onClick={() => { setForm(initialState); setSuccess(null); setStepIndex(0); }}>{t.startAnother}</button>
           </div>
-        </section>
-        <section className="card">
-          <p className="eyebrow">{t.uploadNow}</p>
+          <p className="eyebrow" style={{ marginTop: 28 }}>{t.uploadNow}</p>
           <p className="muted">{t.uploadNowNote}</p>
         </section>
         <UploadForm caseId={success.caseId} allowedDocumentCodes={success.seededDocuments} defaultDocumentCode={success.seededDocuments[0] || 'id-card'} />
@@ -309,7 +300,7 @@ export function IntakeForm() {
   }
 
   return (
-    <div className="intake-layout" dir={dir}>
+    <div className="intake-flow-wide grid" dir={dir}>
       <section className="card intake-shell">
         <div className="intake-header">
           <div>
@@ -395,7 +386,7 @@ export function IntakeForm() {
 
           {currentStep.key === 'review' && <div className="grid">
             <div className="review-grid">{reviewItems.map((item) => <div key={item.label} className="review-row"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>
-            <div className="card nested-card"><p className="eyebrow">{t.reviewSummary}</p><p className="muted">{t.readyNote}</p></div>
+            <div className="card nested-card"><p className="eyebrow">{t.reviewSummary}</p><p className="muted">{t.reviewHint}</p></div>
           </div>}
         </div>
 
@@ -406,11 +397,6 @@ export function IntakeForm() {
           {stepIndex < steps.length - 1 ? <button className="button" type="button" onClick={nextStep} disabled={submitting}>{t.continue}</button> : <button className="button" type="button" onClick={handleSubmit} disabled={submitting}>{submitting ? t.submitting : t.submit}</button>}
         </div>
       </section>
-
-      <aside className="grid intake-aside" dir={dir}>
-        <section className="card"><p className="eyebrow">{t.nextSteps}</p><ul className="list">{t.nextStepsItems.map((item) => <li key={item}>{item}</li>)}</ul></section>
-        <section className="card"><p className="eyebrow">{t.ready}</p><p className="muted">{t.readyNote}</p></section>
-      </aside>
     </div>
   );
 }
