@@ -38,7 +38,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid email or password' }, { status: 401 });
   }
 
-  const token = await createStaffSessionToken({ email: found.data.email, recordId: found.data.recordId });
+  const token = await createStaffSessionToken({
+    email: found.data.email,
+    recordId: found.data.recordId,
+    role: found.data.role,
+  });
   const response = NextResponse.json({ ok: true, email: found.data.email });
   response.cookies.set(STAFF_AUTH_COOKIE, token, staffCookieOptions());
   response.cookies.set(OFFICE_AUTH_COOKIE, '', { ...officeCookieOptions(), maxAge: 0 });

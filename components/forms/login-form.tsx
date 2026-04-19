@@ -154,11 +154,7 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
             <button className="button" type="submit" disabled={staffSubmitting}>
               {staffSubmitting ? t.signingIn : t.signIn}
             </button>
-            {staffError ? (
-              <p className="muted" style={{ color: '#f97066' }}>
-                {staffError}
-              </p>
-            ) : null}
+            {staffError ? <p className="muted text-feedback-error">{staffError}</p> : null}
           </form>
         ) : null}
 
@@ -194,8 +190,8 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
                 <button className="button button-secondary" type="submit" disabled={regSubmitting}>
                   {regSubmitting ? t.registering : t.registerCta}
                 </button>
-                {regMessage ? <p className="muted" style={{ color: '#7ee787' }}>{regMessage}</p> : null}
-                {regError ? <p className="muted" style={{ color: '#f97066' }}>{regError}</p> : null}
+                {regMessage ? <p className="muted text-feedback-success">{regMessage}</p> : null}
+                {regError ? <p className="muted text-feedback-error">{regError}</p> : null}
               </form>
             ) : null}
           </div>

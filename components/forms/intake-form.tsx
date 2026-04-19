@@ -357,7 +357,7 @@ export function IntakeForm() {
           <h2>{t.successTitle}</h2>
           <p className="muted">{t.successBody}</p>
           {success.uploadFailures.length ? (
-            <p className="muted" style={{ color: '#fbbf24' }}>
+            <p className="muted text-feedback-warn">
               {t.uploadPartialWarn}{' '}
               {success.uploadFailures.join(', ')}
             </p>

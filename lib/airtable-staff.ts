@@ -1,6 +1,7 @@
 import { env, hasAirtableConfig } from '@/lib/env';
 import { createAirtableRecord, findAirtableRecordByField } from '@/lib/airtable';
 import type { ActionResult } from '@/lib/types';
+import { normalizeStaffRole } from '@/lib/staff-roles';
 
 type StaffRecordFields = {
   email?: string;
@@ -13,6 +14,7 @@ const EMAIL_FIELDS = ['Email', 'email', 'E-mail'];
 const HASH_FIELDS = ['Password hash', 'Password Hash', 'password hash', 'Password'];
 const NAME_FIELDS = ['Full name', 'Full Name', 'Name'];
 const ACTIVE_FIELDS = ['Active', 'active', 'Enabled'];
+const ROLE_FIELDS = ['Role', 'role', 'Staff role', 'Staff Role'];
 
 function pickFirstString(fields: Record<string, unknown>, names: string[]): string {
   for (const n of names) {
@@ -30,6 +32,11 @@ function pickActive(fields: Record<string, unknown>): boolean {
   return true;
 }
 
+function pickRole(fields: Record<string, unknown>): string {
+  const raw = pickFirstString(fields, ROLE_FIELDS);
+  return normalizeStaffRole(raw || undefined);
+}
+
 function staffTableName() {
   return env.airtableStaffTable || 'Staff';
 }
@@ -40,6 +47,7 @@ export type StaffUserRow = {
   passwordHash: string;
   fullName: string;
   active: boolean;
+  role: string;
 };
 
 export async function findStaffByEmail(email: string): Promise<ActionResult<StaffUserRow>> {
@@ -66,6 +74,7 @@ export async function findStaffByEmail(email: string): Promise<ActionResult<Staf
           passwordHash: hash,
           fullName: pickFirstString(f as Record<string, unknown>, NAME_FIELDS),
           active: pickActive(f as Record<string, unknown>),
+          role: pickRole(f as Record<string, unknown>),
         },
       };
     }
@@ -88,6 +97,7 @@ export async function createStaffInAirtable(input: {
     [EMAIL_FIELDS[0]]: input.email.trim().toLowerCase(),
     [HASH_FIELDS[0]]: input.passwordHash,
     [ACTIVE_FIELDS[0]]: true,
+    [ROLE_FIELDS[0]]: 'advisor',
   };
   if (input.fullName?.trim()) {
     fields[NAME_FIELDS[0]] = input.fullName.trim();

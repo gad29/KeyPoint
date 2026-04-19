@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { requestHasStaffSession } from '@/lib/staff-session';
+import { canAccessAdvisorFinanceDashboard } from '@/lib/staff-roles';
+import { getStaffSessionFromRequest } from '@/lib/staff-session';
 
 function isCasesListPath(pathname: string) {
   return pathname === '/api/cases' || pathname === '/api/cases/';
+}
+
+function isAdvisorAdminPath(pathname: string) {
+  return pathname.startsWith('/admin') || pathname.startsWith('/api/admin');
 }
 
 function isProtectedOfficePath(request: NextRequest) {
@@ -11,7 +16,9 @@ function isProtectedOfficePath(request: NextRequest) {
   const method = request.method;
 
   if (pathname.startsWith('/office')) return true;
+  if (pathname.startsWith('/admin')) return true;
   if (pathname.startsWith('/api/invites')) return true;
+  if (pathname.startsWith('/api/admin')) return true;
   if (/^\/api\/cases\/[^/]+(?:\/offers)?$/.test(pathname)) return true;
 
   // Listing all cases must never be public (office UI loads data server-side; this blocks direct API scraping).
@@ -29,7 +36,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (await requestHasStaffSession(request)) {
+  const staffSession = await getStaffSessionFromRequest(request);
+  if (staffSession) {
+    if (isAdvisorAdminPath(pathname) && !canAccessAdvisorFinanceDashboard(staffSession.role)) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ ok: false, error: 'Advisor or admin role required' }, { status: 403 });
+      }
+      return NextResponse.redirect(new URL('/office/active', request.url));
+    }
     return NextResponse.next();
   }
 
@@ -43,5 +57,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/office/:path*', '/api/:path*'],
+  matcher: ['/office/:path*', '/admin/:path*', '/api/:path*'],
 };

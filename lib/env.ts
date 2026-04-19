@@ -8,6 +8,8 @@ export const env = {
   airtableBankRunsTable: process.env.AIRTABLE_BANK_RUNS_TABLE || 'Bank runs',
   airtableAiReviewsTable: process.env.AIRTABLE_AI_REVIEWS_TABLE || 'AI reviews',
   airtableStaffTable: process.env.AIRTABLE_STAFF_TABLE || 'Staff',
+  airtableFinanceTransactionsTable: process.env.AIRTABLE_FINANCE_TRANSACTIONS_TABLE || 'Finance transactions',
+  airtableBillingEventsTable: process.env.AIRTABLE_BILLING_EVENTS_TABLE || 'Billing events',
   staffSessionSecret: process.env.STAFF_SESSION_SECRET,
   staffRegisterSecret: process.env.STAFF_REGISTER_SECRET,
   n8nWebhookBaseUrl: process.env.N8N_WEBHOOK_BASE_URL,

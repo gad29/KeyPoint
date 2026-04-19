@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
 import { env, isProductionLike } from '@/lib/env';
+import { normalizeStaffRole } from '@/lib/staff-roles';
 
 export const STAFF_AUTH_COOKIE = 'keypoint-staff-session';
 const DEFAULT_SESSION_HOURS = 12;
@@ -52,13 +53,17 @@ export type StaffSessionPayload = {
   email: string;
   recordId: string;
   expiresAt: string;
+  /** Lowercase role from Airtable Staff (e.g. advisor, admin, secretary). */
+  role: string;
 };
 
-export async function createStaffSessionToken(payload: Pick<StaffSessionPayload, 'email' | 'recordId'>) {
+export async function createStaffSessionToken(payload: Pick<StaffSessionPayload, 'email' | 'recordId' | 'role'>) {
+  const role = normalizeStaffRole(payload.role);
   const full: StaffSessionPayload = {
     scope: 'staff',
     email: payload.email,
     recordId: payload.recordId,
+    role,
     expiresAt: new Date(Date.now() + getSessionHours() * 60 * 60 * 1000).toISOString(),
   };
   const encodedPayload = base64url(JSON.stringify(full));
@@ -73,9 +78,13 @@ export async function parseStaffSessionToken(token: string | undefined | null): 
   const expectedSignature = await signPayload(encodedPayload);
   if (!constantTimeEqual(signature, expectedSignature)) return null;
   try {
-    const payload = JSON.parse(decodeBase64url(encodedPayload)) as StaffSessionPayload;
-    if (payload.scope !== 'staff' || !payload.email || !payload.recordId || !payload.expiresAt) return null;
-    if (new Date(payload.expiresAt).getTime() < Date.now()) return null;
+    const raw = JSON.parse(decodeBase64url(encodedPayload)) as StaffSessionPayload & { role?: string };
+    if (raw.scope !== 'staff' || !raw.email || !raw.recordId || !raw.expiresAt) return null;
+    if (new Date(raw.expiresAt).getTime() < Date.now()) return null;
+    const payload: StaffSessionPayload = {
+      ...raw,
+      role: normalizeStaffRole(raw.role),
+    };
     return payload;
   } catch {
     return null;
@@ -84,6 +93,10 @@ export async function parseStaffSessionToken(token: string | undefined | null): 
 
 export async function requestHasStaffSession(request: NextRequest) {
   return Boolean(await parseStaffSessionToken(request.cookies.get(STAFF_AUTH_COOKIE)?.value));
+}
+
+export async function getStaffSessionFromRequest(request: NextRequest) {
+  return parseStaffSessionToken(request.cookies.get(STAFF_AUTH_COOKIE)?.value);
 }
 
 export async function currentRequestHasStaffSession() {

@@ -5,6 +5,12 @@ import type { ReactNode } from 'react';
 import { I18nProvider } from '@/components/i18n';
 import { PublicFrame } from '@/components/public-shell';
 import { OfficeFrame } from '@/components/office-shell';
+import { AdminFrame } from '@/components/admin-shell';
+import { PageEnterMotion } from '@/components/page-enter-motion';
+
+function usesAdminChrome(pathname: string) {
+  return pathname.startsWith('/admin');
+}
 
 function usesOfficeChrome(pathname: string) {
   return (
@@ -16,6 +22,9 @@ function usesOfficeChrome(pathname: string) {
 
 function ShellRouter({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  if (usesAdminChrome(pathname)) {
+    return <AdminFrame>{children}</AdminFrame>;
+  }
   if (usesOfficeChrome(pathname)) {
     return <OfficeFrame>{children}</OfficeFrame>;
   }
@@ -25,7 +34,9 @@ function ShellRouter({ children }: { children: ReactNode }) {
 export function RouteShell({ children }: { children: ReactNode }) {
   return (
     <I18nProvider>
-      <ShellRouter>{children}</ShellRouter>
+      <PageEnterMotion>
+        <ShellRouter>{children}</ShellRouter>
+      </PageEnterMotion>
     </I18nProvider>
   );
 }

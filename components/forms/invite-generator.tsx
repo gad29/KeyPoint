@@ -55,7 +55,7 @@ export function InviteGenerator({ caseId }: { caseId: string }) {
         {loading ? t.loading : t.button}
       </button>
       {link ? <div style={{ marginTop: 12 }}><strong>{t.ready}</strong><p className="muted" style={{ marginTop: 8 }}>{link}</p></div> : null}
-      {error ? <p style={{ color: '#ff8f8f' }}>{error}</p> : null}
+      {error ? <p className="text-feedback-error">{error}</p> : null}
     </div>
   );
 }

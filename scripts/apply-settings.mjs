@@ -67,6 +67,8 @@ const appEnv = {
   AIRTABLE_ACTIVITY_LOG_TABLE: tables.activityLog || 'Activity log',
   AIRTABLE_AI_REVIEWS_TABLE: tables.aiReviews || 'AI reviews',
   AIRTABLE_STAFF_TABLE: tables.staff || 'Staff',
+  AIRTABLE_FINANCE_TRANSACTIONS_TABLE: tables.financeTransactions || 'Finance transactions',
+  AIRTABLE_BILLING_EVENTS_TABLE: tables.billingEvents || 'Billing events',
   N8N_WEBHOOK_BASE_URL: n8nBase,
   UPLOAD_DIR: storage.uploadDir || './data/uploads',
   UPLOAD_PUBLIC_BASE_URL: storage.uploadPublicBaseUrl || '',
