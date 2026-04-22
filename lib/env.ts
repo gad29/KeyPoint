@@ -35,6 +35,7 @@ export const env = {
   emailProviderWebhookUrl: process.env.EMAIL_PROVIDER_WEBHOOK_URL,
   documentOcrWebhookUrl: process.env.DOCUMENT_OCR_WEBHOOK_URL,
   aiReviewWebhookUrl: process.env.AI_REVIEW_WEBHOOK_URL,
+  secretaryWhatsapp: process.env.SECRETARY_WHATSAPP,
   googleClientEmail: process.env.GOOGLE_CLIENT_EMAIL,
   googlePrivateKey: process.env.GOOGLE_PRIVATE_KEY,
   googleDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID,

@@ -1,0 +1,91 @@
+{
+  "name": "KeyPoint | Missing docs — secretary reminder",
+  "nodes": [
+    {
+      "id": "cronTrigger",
+      "name": "Every 2 days at 9:00 AM",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [220, 280],
+      "parameters": {
+        "triggerTimes": {
+          "item": [{ "mode": "custom", "cronExpression": "0 9 */2 * *" }]
+        }
+      }
+    },
+    {
+      "id": "loadStuckCases",
+      "name": "Load stuck cases",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [440, 280],
+      "parameters": {
+        "operation": "list",
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "={{ $env.AIRTABLE_CASES_TABLE }}",
+        "filterByFormula": "AND({Current stage} = 'documents-in-progress', {Missing items count} > 0)",
+        "fields": ["Case ID", "Lead name", "Phone", "Missing items count", "Assigned staff", "Next action"]
+      },
+      "credentials": {
+        "airtableTokenApi": { "id": "airtable-keypoint", "name": "Airtable KeyPoint" }
+      }
+    },
+    {
+      "id": "checkHasCases",
+      "name": "Any stuck cases?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 280],
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $items().length }}", "operation": "larger", "value2": 0 }]
+        }
+      }
+    },
+    {
+      "id": "buildReminderAlert",
+      "name": "Build secretary reminder",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200],
+      "parameters": {
+        "jsCode": "const cases = $input.all().map(r => r.json);\nconst lines = [\n  `📋 *תזכורת — מסמכים חסרים (${cases.length} תיקים)*`,\n  `יש לפנות ללקוחות ולבקש את המסמכים החסרים:`,\n  ''\n];\ncases.forEach(c => {\n  lines.push(`• *${c['Lead name']}* — ${c['Missing items count']} חסרים`);\n  if (c.Phone) lines.push(`  טל׳: ${c.Phone}`);\n  if (c['Next action']) lines.push(`  פעולה: ${c['Next action']}`);\n});\nreturn [{ json: { message: lines.join('\\n'), count: cases.length } }];"
+      }
+    },
+    {
+      "id": "sendAlert",
+      "name": "Notify secretary via alert webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1100, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ text: $json.message, kind: 'missing-docs-reminder' }) }}"
+      }
+    },
+    {
+      "id": "noOp",
+      "name": "No stuck cases — skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, 400],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Every 2 days at 9:00 AM": { "main": [[{ "node": "Load stuck cases", "type": "main", "index": 0 }]] },
+    "Load stuck cases": { "main": [[{ "node": "Any stuck cases?", "type": "main", "index": 0 }]] },
+    "Any stuck cases?": {
+      "main": [
+        [{ "node": "Build secretary reminder", "type": "main", "index": 0 }],
+        [{ "node": "No stuck cases — skip", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build secretary reminder": { "main": [[{ "node": "Notify secretary via alert webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "description": "Every 2 days: if any case is in documents-in-progress with missing items, sends a list to the secretary to follow up with clients manually." }
+}

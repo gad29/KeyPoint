@@ -700,6 +700,96 @@ export async function createAirtableCaseDocument(caseId: string, documentCode: s
   return createAirtableRecord(env.airtableDocumentsTable, mapped.fields);
 }
 
+export interface CaseDocumentRecord {
+  recordId: string;
+  caseId: string;
+  documentCode: string;
+  status: string;
+  uploadedFileUrl?: string;
+  reviewNotes?: string;
+  approvedAt?: string;
+}
+
+export async function listAirtableCaseDocuments(caseId: string): Promise<ActionResult<CaseDocumentRecord[]>> {
+  const schema = await getTableSchema(env.airtableDocumentsTable, documentFieldAliases);
+  const caseLinkField = resolveFieldName(schema, documentFieldAliases.caseLink);
+  if (!caseLinkField) {
+    return { ok: false, error: 'Case documents table does not include a case link field' };
+  }
+
+  const result = await listAirtableRecords<Record<string, unknown>>(env.airtableDocumentsTable, {
+    filterByFormula: `{${caseLinkField}}='${caseId.replace(/'/g, "\\'")}'`,
+  });
+
+  if (!result.ok || !result.data) {
+    return { ok: false, error: result.error || 'Failed to list case documents' };
+  }
+
+  const docs: CaseDocumentRecord[] = result.data.map((rec) => {
+    const f = rec.fields;
+    const resolveF = (aliases: string[]) => {
+      for (const alias of aliases) {
+        if (f[alias] !== undefined) return f[alias];
+      }
+      return undefined;
+    };
+    return {
+      recordId: rec.id,
+      caseId: asString(resolveF(documentFieldAliases.caseLink)),
+      documentCode: asString(resolveF(documentFieldAliases.documentCode)),
+      status: asString(resolveF(documentFieldAliases.status), 'not-uploaded'),
+      uploadedFileUrl: asString(resolveF(documentFieldAliases.uploadedFileUrl)) || undefined,
+      reviewNotes: asString(resolveF(documentFieldAliases.reviewNotes)) || undefined,
+      approvedAt: asString(resolveF(documentFieldAliases.approvedAt)) || undefined,
+    };
+  });
+
+  return { ok: true, data: docs };
+}
+
+export async function updateAirtableCaseDocumentStatus(
+  caseId: string,
+  documentCode: string,
+  status: string,
+  reviewNote?: string,
+): Promise<ActionResult<CaseDocumentRecord>> {
+  const listResult = await listAirtableCaseDocuments(caseId);
+  if (!listResult.ok || !listResult.data) {
+    return { ok: false, error: listResult.error || 'Could not list documents for case' };
+  }
+
+  const existing = listResult.data.find((d) => d.documentCode === documentCode);
+  if (!existing) {
+    return { ok: false, error: `Document ${documentCode} not found for case ${caseId}` };
+  }
+
+  const schema = await getTableSchema(env.airtableDocumentsTable, documentFieldAliases);
+  const updateFields: Record<string, unknown> = {};
+
+  const statusField = resolveFieldName(schema, documentFieldAliases.status);
+  if (statusField) updateFields[statusField] = status;
+
+  if (reviewNote) {
+    const notesField = resolveFieldName(schema, documentFieldAliases.reviewNotes);
+    if (notesField) updateFields[notesField] = reviewNote;
+  }
+
+  if (status === 'approved') {
+    const approvedField = resolveFieldName(schema, documentFieldAliases.approvedAt);
+    if (approvedField) updateFields[approvedField] = new Date().toISOString();
+  }
+
+  if (status === 'resubmit-needed') {
+    const resubField = resolveFieldName(schema, documentFieldAliases.requestedResubmissionAt);
+    if (resubField) updateFields[resubField] = new Date().toISOString();
+  }
+
+  const updated = await updateAirtableRecord(env.airtableDocumentsTable, existing.recordId, updateFields);
+  if (!updated.ok) return { ok: false, error: updated.error || 'Failed to update document status' };
+
+  return { ok: true, data: { ...existing, status, reviewNotes: reviewNote ?? existing.reviewNotes } };
+}
+
 export async function listAirtableBankRuns(caseId: string): Promise<ActionResult<BankOffer[]>> {
   const schema = await getTableSchema(env.airtableBankRunsTable, bankRunFieldAliases);
   const caseLinkField = resolveFieldName(schema, bankRunFieldAliases.caseLink);

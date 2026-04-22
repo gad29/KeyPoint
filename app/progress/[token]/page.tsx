@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { PortalPageClient } from '@/components/portal-page';
-import { getCase, getCaseChecklist, getInvite, listBankOffers } from '@/lib/repository';
+import { getCase, getCaseChecklist, getInvite, listBankOffers, listCaseDocuments } from '@/lib/repository';
+import { env } from '@/lib/env';
 
 export default async function ProgressPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -10,10 +11,24 @@ export default async function ProgressPage({ params }: { params: Promise<{ token
   const caseRecord = await getCase(invite.caseId);
   if (!caseRecord) return notFound();
 
-  const [requiredDocuments, offers] = await Promise.all([
+  const [requiredDocuments, offers, docRecords] = await Promise.all([
     getCaseChecklist(invite.caseId),
     listBankOffers(invite.caseId),
+    listCaseDocuments(invite.caseId),
   ]);
 
-  return <PortalPageClient caseRecord={caseRecord} requiredDocuments={requiredDocuments} offers={offers} />;
+  const docStatuses: Record<string, string> = {};
+  for (const d of docRecords) {
+    docStatuses[d.documentCode] = d.status;
+  }
+
+  return (
+    <PortalPageClient
+      caseRecord={caseRecord}
+      requiredDocuments={requiredDocuments}
+      offers={offers}
+      docStatuses={docStatuses}
+      secretaryWhatsapp={env.secretaryWhatsapp}
+    />
+  );
 }

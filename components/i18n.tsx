@@ -50,6 +50,11 @@ export function useI18n() {
   return context;
 }
 
+/** Always returns Hebrew/RTL — for office and admin UI where language is fixed. */
+export function useOfficeI18n() {
+  return { dir: 'rtl' as const, language: 'he' as const };
+}
+
 export function LanguageSwitch() {
   const { language, setLanguage } = useI18n();
 

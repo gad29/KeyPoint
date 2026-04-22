@@ -19,7 +19,7 @@ function isProtectedOfficePath(request: NextRequest) {
   if (pathname.startsWith('/admin')) return true;
   if (pathname.startsWith('/api/invites')) return true;
   if (pathname.startsWith('/api/admin')) return true;
-  if (/^\/api\/cases\/[^/]+(?:\/offers)?$/.test(pathname)) return true;
+  if (/^\/api\/cases\/[^/]+(?:\/offers|\/documents)?$/.test(pathname)) return true;
 
   // Listing all cases must never be public (office UI loads data server-side; this blocks direct API scraping).
   if (isCasesListPath(pathname) && (method === 'GET' || method === 'HEAD')) {

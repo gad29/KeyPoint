@@ -34,10 +34,9 @@ const steps: StepDefinition[] = [
   {
     key: 'documents',
     label: { en: 'Documents', he: 'מסמכים' },
-    title: { en: 'Upload required documents', he: 'העלאת מסמכים נדרשים' },
-    description: { en: 'Attach clear PDFs or photos for each item.', he: 'צרפו קבצי PDF או צילומים ברורים לכל סעיף.' },
+    title: { en: 'Upload & send', he: 'מסמכים ושליחה' },
+    description: { en: 'Attach clear PDFs or photos, then submit.', he: 'צרפו מסמכים ברורים ושלחו את הטופס.' },
   },
-  { key: 'review', label: { en: 'Review', he: 'סקירה' }, title: { en: 'Review & send', he: 'סקירה ושליחה' }, description: { en: 'Check and submit.', he: 'בדיקה ושליחה.' } },
 ];
 
 const initialState: IntakePayload = {
@@ -70,7 +69,7 @@ const copy = {
     submitFailShort: 'Failed to submit intake',
     successEyebrow: 'Case received',
     successTitle: 'Your case was received successfully',
-    successBody: 'We will contact you. You can upload documents below.',
+    successBody: 'Our advisor will contact you within 24 hours. You can upload documents below.',
     caseId: 'Case ID',
     submissionId: 'Submission ID',
     source: 'Source',
@@ -141,7 +140,7 @@ const copy = {
     submitFailShort: 'לא ניתן היה לשלוח את הטופס',
     successEyebrow: 'התיק התקבל',
     successTitle: 'הבקשה נקלטה בהצלחה',
-    successBody: 'נחזור אליכם. אפשר להעלות מסמכים למטה.',
+    successBody: 'הנציגה שלנו תיצור איתך קשר בתוך 24 שעות. ניתן להעלות מסמכים ראשונים כבר עכשיו.',
     caseId: 'מספר תיק',
     submissionId: 'מספר שליחה',
     source: 'מקור',
@@ -197,6 +196,8 @@ const copy = {
   },
 };
 
+const DRAFT_KEY = 'keypoint-intake-draft';
+
 function currencyPlaceholder(language: Lang) {
   return language === 'he' ? '₪ לדוגמה 1,850,000' : '₪ e.g. 1,850,000';
 }
@@ -222,6 +223,26 @@ export function IntakeForm() {
   useEffect(() => {
     setFilesByCode({});
   }, [requiredCodesKey]);
+
+  // Restore draft from localStorage once on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as { form?: IntakePayload; stepIndex?: number };
+        if (saved.form) setForm(saved.form);
+        if (typeof saved.stepIndex === 'number') setStepIndex(saved.stepIndex);
+      }
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autosave draft to localStorage whenever form or step changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, stepIndex }));
+    } catch {}
+  }, [form, stepIndex]);
 
   const currentStep = steps[stepIndex];
   const progress = ((stepIndex + 1) / steps.length) * 100;
@@ -278,13 +299,6 @@ export function IntakeForm() {
           if (!file || !(file instanceof File)) return t.documentsRequired;
         }
         return null;
-      case 'review':
-        if (!requiredCodes.length) return null;
-        for (const code of requiredCodes) {
-          const file = filesByCode[code];
-          if (!file || !(file instanceof File)) return t.documentsRequired;
-        }
-        return null;
       default:
         return null;
     }
@@ -327,6 +341,7 @@ export function IntakeForm() {
         const up = await fetch('/api/uploads', { method: 'POST', body: fd });
         if (!up.ok) uploadFailures.push(code);
       }
+      try { localStorage.removeItem(DRAFT_KEY); } catch {}
       setSuccess({
         caseId,
         submissionId: json.meta?.submissionId || 'pending',
@@ -371,6 +386,7 @@ export function IntakeForm() {
               className="button"
               type="button"
               onClick={() => {
+                try { localStorage.removeItem(DRAFT_KEY); } catch {}
                 setForm(initialState);
                 setFilesByCode({});
                 setSuccess(null);
@@ -500,13 +516,19 @@ export function IntakeForm() {
                   })}
                 </div>
               )}
+              {/* Compact summary before submit */}
+              <div className="card nested-card" style={{ marginTop: 4 }}>
+                <p className="eyebrow" style={{ marginBottom: 8 }}>{t.reviewSummary}</p>
+                <div className="review-grid compact" style={{ gap: 4 }}>
+                  {reviewItems.slice(0, 4).map((item) => (
+                    <div key={item.label} className="review-row">
+                      <span>{item.label}</span><strong>{item.value}</strong>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
-
-          {currentStep.key === 'review' && <div className="grid">
-            <div className="review-grid">{reviewItems.map((item) => <div key={item.label} className="review-row"><span>{item.label}</span><strong>{item.value}</strong></div>)}</div>
-            <div className="card nested-card"><p className="eyebrow">{t.reviewSummary}</p><p className="muted">{t.reviewHint}</p></div>
-          </div>}
         </div>
 
         {error ? <p className="form-error">{error}</p> : null}

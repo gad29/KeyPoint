@@ -11,8 +11,10 @@ import {
   createAirtableCaseDocument,
   getAirtableCaseByCaseId,
   listAirtableBankRuns,
+  listAirtableCaseDocuments,
   listAirtableCases,
   updateAirtableCase,
+  updateAirtableCaseDocumentStatus,
   updateAirtablePortalStatus,
 } from '@/lib/airtable';
 import { postJson, triggerN8n } from '@/lib/n8n';
@@ -454,4 +456,29 @@ export function getStagePresentation(stage: CaseStage) {
 
 export function getUploadDirectory() {
   return path.isAbsolute(env.uploadDir) ? env.uploadDir : path.join(appRoot, env.uploadDir);
+}
+
+export async function listCaseDocuments(caseId: string) {
+  if (!hasAirtableConfig()) return [];
+  const result = await listAirtableCaseDocuments(caseId);
+  if (result.ok && result.data) return result.data;
+  logRepository('warn', 'Live case document listing failed', { caseId, error: result.error });
+  return [];
+}
+
+export async function updateCaseDocumentStatus(
+  caseId: string,
+  documentCode: string,
+  status: string,
+  reviewNote?: string,
+) {
+  if (!hasAirtableConfig()) {
+    return { ok: false, error: 'Airtable must be configured to update document status' } as const;
+  }
+
+  const result = await updateAirtableCaseDocumentStatus(caseId, documentCode, status, reviewNote);
+  if (result.ok) {
+    await safeActivityLog(caseId, 'document-status-updated', `Document ${documentCode} → ${status}`);
+  }
+  return result;
 }

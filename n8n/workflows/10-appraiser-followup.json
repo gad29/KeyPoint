@@ -1,0 +1,102 @@
+{
+  "name": "KeyPoint | Appraiser follow-up reminder",
+  "nodes": [
+    {
+      "id": "cronTrigger",
+      "name": "Daily at 10:00 AM",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [220, 280],
+      "parameters": {
+        "triggerTimes": {
+          "item": [{ "mode": "everyDay", "hour": 10, "minute": 0 }]
+        }
+      }
+    },
+    {
+      "id": "loadWaitingCases",
+      "name": "Load waiting-appraiser cases",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [440, 280],
+      "parameters": {
+        "operation": "list",
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "={{ $env.AIRTABLE_CASES_TABLE }}",
+        "filterByFormula": "{Current stage} = 'waiting-appraiser'",
+        "fields": ["Case ID", "Lead name", "Assigned staff", "Next action", "Last modified"]
+      },
+      "credentials": {
+        "airtableTokenApi": { "id": "airtable-keypoint", "name": "Airtable KeyPoint" }
+      }
+    },
+    {
+      "id": "filterStale",
+      "name": "Filter stale > 4 days",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 280],
+      "parameters": {
+        "jsCode": "const THRESHOLD_MS = 4 * 86400000;\nconst now = Date.now();\nconst stale = $input.all()\n  .map(r => r.json)\n  .filter(c => {\n    const mod = new Date(c['Last modified'] || 0).getTime();\n    return (now - mod) > THRESHOLD_MS;\n  });\nreturn stale.map(c => ({ json: c }));"
+      }
+    },
+    {
+      "id": "checkHasCases",
+      "name": "Any stale appraiser cases?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [880, 280],
+      "parameters": {
+        "conditions": {
+          "number": [{ "value1": "={{ $items().length }}", "operation": "larger", "value2": 0 }]
+        }
+      }
+    },
+    {
+      "id": "buildAlert",
+      "name": "Build appraiser follow-up alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200],
+      "parameters": {
+        "jsCode": "const cases = $input.all().map(r => r.json);\nconst lines = [\n  `🏠 *מעקב שמאות — ${cases.length} תיק/ים ממתינים מעל 4 ימים*`,\n  'יש לבדוק מול השמאי מה המצב:',\n  ''\n];\ncases.forEach(c => {\n  const days = Math.floor((Date.now() - new Date(c['Last modified'] || 0).getTime()) / 86400000);\n  lines.push(`• *${c['Lead name']}* (${c['Case ID']}) — ${days} ימים בהמתנה`);\n  if (c['Next action']) lines.push(`  פעולה: ${c['Next action']}`);\n});\nreturn [{ json: { message: lines.join('\\n'), count: cases.length } }];"
+      }
+    },
+    {
+      "id": "sendAlert",
+      "name": "Notify via alert webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1320, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OFFICE_ALERT_WEBHOOK_URL }}",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ text: $json.message, kind: 'appraiser-followup' }) }}"
+      }
+    },
+    {
+      "id": "noOp",
+      "name": "All appraisers on track — skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1100, 400],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Daily at 10:00 AM": { "main": [[{ "node": "Load waiting-appraiser cases", "type": "main", "index": 0 }]] },
+    "Load waiting-appraiser cases": { "main": [[{ "node": "Filter stale > 4 days", "type": "main", "index": 0 }]] },
+    "Filter stale > 4 days": { "main": [[{ "node": "Any stale appraiser cases?", "type": "main", "index": 0 }]] },
+    "Any stale appraiser cases?": {
+      "main": [
+        [{ "node": "Build appraiser follow-up alert", "type": "main", "index": 0 }],
+        [{ "node": "All appraisers on track — skip", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build appraiser follow-up alert": { "main": [[{ "node": "Notify via alert webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": { "description": "Daily: checks for cases in waiting-appraiser stage with no update in 4+ days. Notifies secretary to follow up with the appraiser." }
+}

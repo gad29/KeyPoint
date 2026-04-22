@@ -1,0 +1,130 @@
+{
+  "name": "KeyPoint | Receipt PDF generator (חשבונית מס קבלה)",
+  "nodes": [
+    {
+      "id": "webhookTrigger",
+      "name": "Webhook: keypoint/billing/receipt",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 280],
+      "webhookId": "keypoint-billing-receipt",
+      "parameters": {
+        "path": "keypoint/billing/receipt",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "validatePayload",
+      "name": "Validate receipt payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 280],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst required = ['clientName', 'amountBeforeVat', 'serviceDescription', 'paymentMethod'];\nconst missing = required.filter(k => !body[k]);\nif (missing.length) throw new Error('Missing required fields: ' + missing.join(', '));\n\nconst amountBeforeVat = Number(body.amountBeforeVat);\nconst vatRate = 0.17;\nconst vatAmount = Math.round(amountBeforeVat * vatRate);\nconst totalAmount = amountBeforeVat + vatAmount;\n\nconst receiptDate = new Date().toLocaleDateString('he-IL');\n\nreturn [{ json: {\n  clientName: body.clientName,\n  clientId: body.clientId || '',\n  serviceDescription: body.serviceDescription || 'ייעוץ משכנתאות',\n  amountBeforeVat,\n  vatAmount,\n  totalAmount,\n  paymentMethod: body.paymentMethod,\n  notes: body.notes || '',\n  caseId: body.caseId || '',\n  clientEmail: body.clientEmail || '',\n  receiptDate,\n  receiptNumber: body.receiptNumber || `R-${Date.now()}`\n}}];"
+      }
+    },
+    {
+      "id": "buildHtml",
+      "name": "Build receipt HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [660, 280],
+      "parameters": {
+        "jsCode": "const d = $input.first().json;\nconst PAYMENT_LABELS = { 'bank-transfer': 'העברה בנקאית', 'cash': 'מזומן', 'credit-card': 'כרטיס אשראי' };\nconst html = `<!DOCTYPE html>\n<html dir=\"rtl\" lang=\"he\">\n<head><meta charset=\"UTF-8\"><style>\nbody { font-family: Arial, sans-serif; direction: rtl; padding: 40px; max-width: 700px; margin: 0 auto; color: #222; }\nh1 { font-size: 22px; margin-bottom: 4px; }\n.subtitle { color: #666; font-size: 14px; margin-bottom: 30px; }\n.meta { border: 1px solid #ddd; border-radius: 8px; padding: 20px; margin-bottom: 24px; }\n.row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }\n.row:last-child { border-bottom: none; }\n.total-row { font-weight: bold; font-size: 16px; color: #0066cc; padding-top: 12px; }\n.footer { margin-top: 40px; font-size: 12px; color: #888; text-align: center; }\n</style></head>\n<body>\n<h1>חשבונית מס קבלה</h1>\n<p class=\"subtitle\">מספר: ${d.receiptNumber} · תאריך: ${d.receiptDate}</p>\n<div class=\"meta\">\n  <div class=\"row\"><span>שם לקוח</span><strong>${d.clientName}</strong></div>\n  ${d.clientId ? `<div class=\"row\"><span>ת.ז.</span><span>${d.clientId}</span></div>` : ''}\n  ${d.caseId ? `<div class=\"row\"><span>מספר תיק</span><span>${d.caseId}</span></div>` : ''}\n  <div class=\"row\"><span>תיאור שירות</span><span>${d.serviceDescription}</span></div>\n  <div class=\"row\"><span>אמצעי תשלום</span><span>${PAYMENT_LABELS[d.paymentMethod] || d.paymentMethod}</span></div>\n</div>\n<div class=\"meta\">\n  <div class=\"row\"><span>סכום לפני מע\"מ</span><span>₪${d.amountBeforeVat.toLocaleString('he-IL')}</span></div>\n  <div class=\"row\"><span>מע\"מ (17%)</span><span>₪${d.vatAmount.toLocaleString('he-IL')}</span></div>\n  <div class=\"row total-row\"><span>סה\"כ לתשלום</span><span>₪${d.totalAmount.toLocaleString('he-IL')}</span></div>\n</div>\n${d.notes ? `<p style=\"font-size:13px;color:#555\">הערות: ${d.notes}</p>` : ''}\n<div class=\"footer\">מסמך זה הופק אוטומטית על ידי מערכת KeyPoint</div>\n</body></html>`;\nreturn [{ json: { ...d, html } }];"
+      }
+    },
+    {
+      "id": "generatePdf",
+      "name": "Generate PDF via pdfshift.io",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [880, 280],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.pdfshift.io/v3/convert/pdf",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ source: $json.html, landscape: false, use_print: false }) }}",
+        "options": {
+          "response": { "response": { "responseFormat": "file" } }
+        }
+      },
+      "credentials": {
+        "httpBasicAuth": { "id": "pdfshift-keypoint", "name": "PDFShift API" }
+      }
+    },
+    {
+      "id": "logToAirtable",
+      "name": "Log billing event to Airtable",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [1100, 180],
+      "parameters": {
+        "operation": "create",
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "={{ $env.AIRTABLE_BILLING_EVENTS_TABLE }}",
+        "fields": {
+          "values": [
+            { "fieldId": "Kind", "fieldValue": "receipt" },
+            { "fieldId": "Case ID", "fieldValue": "={{ $('Validate receipt payload').item.json.caseId }}" },
+            { "fieldId": "Target email", "fieldValue": "={{ $('Validate receipt payload').item.json.clientEmail }}" },
+            { "fieldId": "Amount", "fieldValue": "={{ $('Validate receipt payload').item.json.totalAmount }}" },
+            { "fieldId": "Notes", "fieldValue": "={{ $('Validate receipt payload').item.json.receiptNumber }} — {{ $('Validate receipt payload').item.json.clientName }}" },
+            { "fieldId": "Created at", "fieldValue": "={{ new Date().toISOString() }}" }
+          ]
+        }
+      },
+      "credentials": {
+        "airtableTokenApi": { "id": "airtable-keypoint", "name": "Airtable KeyPoint" }
+      }
+    },
+    {
+      "id": "sendEmail",
+      "name": "Email PDF to client",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1100, 380],
+      "parameters": {
+        "toEmail": "={{ $('Validate receipt payload').item.json.clientEmail }}",
+        "subject": "={{ 'חשבונית מס קבלה — ' + $('Validate receipt payload').item.json.receiptNumber }}",
+        "emailFormat": "html",
+        "html": "={{ '<p>שלום ' + $('Validate receipt payload').item.json.clientName + ',</p><p>מצורפת חשבונית מס קבלה בגין שירות ייעוץ משכנתאות.</p><p>מספר חשבונית: ' + $('Validate receipt payload').item.json.receiptNumber + '</p><p>בברכה,<br>צוות KeyPoint</p>' }}",
+        "attachments": "={{ $binary.data }}"
+      },
+      "credentials": {
+        "smtp": { "id": "smtp-keypoint", "name": "KeyPoint SMTP" }
+      }
+    },
+    {
+      "id": "webhookResponse",
+      "name": "Webhook response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1320, 280],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, receiptNumber: $('Validate receipt payload').item.json.receiptNumber }) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook: keypoint/billing/receipt": { "main": [[{ "node": "Validate receipt payload", "type": "main", "index": 0 }]] },
+    "Validate receipt payload": { "main": [[{ "node": "Build receipt HTML", "type": "main", "index": 0 }]] },
+    "Build receipt HTML": { "main": [[{ "node": "Generate PDF via pdfshift.io", "type": "main", "index": 0 }]] },
+    "Generate PDF via pdfshift.io": {
+      "main": [[
+        { "node": "Log billing event to Airtable", "type": "main", "index": 0 },
+        { "node": "Email PDF to client", "type": "main", "index": 0 },
+        { "node": "Webhook response", "type": "main", "index": 0 }
+      ]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "Triggered via POST keypoint/billing/receipt. Generates an Israeli חשבונית מס קבלה PDF (via pdfshift.io), emails it to the client, and logs the event in Airtable. Requires PDFShift API credentials and SMTP credentials in n8n."
+  }
+}
