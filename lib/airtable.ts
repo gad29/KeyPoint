@@ -305,6 +305,7 @@ function buildWriteFields(
 ): WriteFieldsResult {
   const fields: Record<string, unknown> = {};
   const missing: string[] = [];
+  const resolvedSemanticKeys = new Set<string>();
 
   for (const [semanticKey, value] of Object.entries(values)) {
     if (value === undefined) continue;
@@ -319,6 +320,7 @@ function buildWriteFields(
     }
 
     fields[fieldName] = value;
+    resolvedSemanticKeys.add(semanticKey);
   }
 
   if (missing.length && options?.table) {
@@ -329,7 +331,7 @@ function buildWriteFields(
     });
   }
 
-  const requiredMissing = options?.required?.filter((key) => !(key in fields)) ?? [];
+  const requiredMissing = options?.required?.filter((key) => !resolvedSemanticKeys.has(key)) ?? [];
   if (requiredMissing.length && options?.table) {
     logAirtable('error', 'Airtable table is missing required fields for operation', {
       table: options.table,
