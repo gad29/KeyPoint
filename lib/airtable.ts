@@ -923,6 +923,47 @@ async function seedAirtableCaseDocumentsForRecord(caseId: string, caseType: Case
   return { ok: true, data: documentCodes } as const;
 }
 
+/**
+ * Look up an existing case by the main applicant's national ID number.
+ * Searches the Clients table for a matching `ID number` field and, if found,
+ * resolves the linked case. Returns null when nothing matches — callers use
+ * this for the "resume where you left off" intake UX.
+ */
+export async function findCaseByApplicantIdNumber(
+  idNumber: string,
+): Promise<ActionResult<{ caseId: string; leadName: string; stage: CaseStage } | null>> {
+  if (!hasAirtableConfig()) return { ok: true, data: null };
+
+  const normalized = idNumber.replace(/\D/g, '').trim();
+  if (normalized.length < 5) return { ok: true, data: null };
+
+  const schema = await getTableSchema(env.airtableClientsTable, clientFieldAliases);
+  const idField = resolveFieldName(schema, clientFieldAliases.idNumber);
+  if (!idField) return { ok: true, data: null };
+
+  const result = await listAirtableRecords<Record<string, unknown>>(env.airtableClientsTable, {
+    filterByFormula: `{${idField}}='${normalized.replace(/'/g, "\\'")}'`,
+    maxRecords: '1',
+  });
+
+  if (!result.ok || !result.data?.length) return { ok: true, data: null };
+
+  const caseLink = asString(pickFieldValue(result.data[0].fields, schema, clientFieldAliases.caseLink));
+  if (!caseLink) return { ok: true, data: null };
+
+  const caseResult = await getAirtableCaseByCaseId(caseLink);
+  if (!caseResult.ok || !caseResult.data) return { ok: true, data: null };
+
+  return {
+    ok: true,
+    data: {
+      caseId: caseResult.data.id,
+      leadName: caseResult.data.leadName,
+      stage: caseResult.data.stage,
+    },
+  };
+}
+
 export async function createNativeIntakeCase(input: CreateCaseInput & { intake: IntakePayload }) {
   const normalizedCaseType = normalizeCaseType(input.caseType);
   const normalizedBorrowerProfiles = normalizeBorrowerProfiles(input.borrowerProfiles);
