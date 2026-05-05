@@ -1,9 +1,24 @@
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdvisorFinanceAccess } from '@/lib/admin-auth';
-import { createStaffInAirtable, emailExistsInStaff } from '@/lib/airtable-staff';
+import { createStaffInAirtable, emailExistsInStaff, listStaffUsers } from '@/lib/airtable-staff';
 import { canUseStaffLogin, looksLikePlaceholder } from '@/lib/env';
 import { normalizeStaffRole } from '@/lib/staff-roles';
+
+export async function GET() {
+  const gate = await requireAdvisorFinanceAccess();
+  if (!gate.ok) {
+    return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
+  }
+  if (!canUseStaffLogin()) {
+    return NextResponse.json({ ok: true, data: [] });
+  }
+  const result = await listStaffUsers();
+  if (!result.ok) {
+    return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
+  }
+  return NextResponse.json({ ok: true, data: result.data });
+}
 
 const SALT_ROUNDS = 12;
 const MIN_PASSWORD = 10;

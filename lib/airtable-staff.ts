@@ -1,5 +1,10 @@
 import { env, hasAirtableConfig } from '@/lib/env';
-import { createAirtableRecord, findAirtableRecordByField } from '@/lib/airtable';
+import {
+  createAirtableRecord,
+  findAirtableRecordByField,
+  listAirtableRecords,
+  updateAirtableRecord,
+} from '@/lib/airtable';
 import type { ActionResult } from '@/lib/types';
 import { normalizeStaffRole } from '@/lib/staff-roles';
 
@@ -116,4 +121,58 @@ export async function createStaffInAirtable(input: {
 export async function emailExistsInStaff(email: string): Promise<boolean> {
   const r = await findStaffByEmail(email);
   return r.ok;
+}
+
+export async function updateStaffPasswordHash(
+  recordId: string,
+  newPasswordHash: string,
+): Promise<ActionResult<{ id: string }>> {
+  if (!hasAirtableConfig()) {
+    return { ok: false, error: 'Airtable is not configured' };
+  }
+
+  const table = staffTableName();
+  const fields: Record<string, unknown> = {
+    [HASH_FIELDS[0]]: newPasswordHash,
+  };
+
+  const res = await updateAirtableRecord(table, recordId, fields);
+  if (!res.ok || !res.data) {
+    return { ok: false, error: res.error || 'Failed to update password' };
+  }
+  return { ok: true, data: { id: (res.data as { id: string }).id } };
+}
+
+export type StaffSummaryRow = {
+  recordId: string;
+  email: string;
+  fullName: string;
+  active: boolean;
+  role: string;
+};
+
+export async function listStaffUsers(): Promise<ActionResult<StaffSummaryRow[]>> {
+  if (!hasAirtableConfig()) {
+    return { ok: true, data: [] };
+  }
+
+  const table = staffTableName();
+  const result = await listAirtableRecords<StaffRecordFields>(table, { maxRecords: '100' });
+  if (!result.ok || !result.data) {
+    return { ok: false, error: result.error || 'Failed to load staff' };
+  }
+
+  const rows: StaffSummaryRow[] = result.data.map((rec) => {
+    const f = rec.fields as Record<string, unknown>;
+    return {
+      recordId: rec.id,
+      email: pickFirstString(f, EMAIL_FIELDS),
+      fullName: pickFirstString(f, NAME_FIELDS),
+      active: pickActive(f),
+      role: pickRole(f),
+    };
+  });
+
+  rows.sort((a, b) => a.email.localeCompare(b.email));
+  return { ok: true, data: rows };
 }

@@ -17,9 +17,12 @@ const copy = {
     staffBody: 'Use your staff email and password. Clients cannot access this area.',
     email: 'Work email',
     password: 'Password',
+    showPassword: 'Show',
+    hidePassword: 'Hide',
     signIn: 'Sign in',
     signingIn: 'Signing in…',
     signInError: 'Could not sign in',
+    forgotPassword: 'Forgot password? ask an admin to reset it from the dashboard.',
     staffUnavailable: 'Staff sign-in needs Airtable configured and a Staff table with hashed passwords.',
     registerToggle: 'Create staff account (setup)',
     registerTitle: 'Register a staff user',
@@ -39,9 +42,12 @@ const copy = {
     staffBody: 'התחברו עם אימייל וסיסמה של צוות. אזור זה אינו זמין ללקוחות.',
     email: 'אימייל עבודה',
     password: 'סיסמה',
+    showPassword: 'הצג',
+    hidePassword: 'הסתר',
     signIn: 'כניסה',
     signingIn: 'מתחבר…',
     signInError: 'הכניסה נכשלה',
+    forgotPassword: 'שכחת סיסמה? בקש מהאדמין לאפס אותה דרך לוח הבקרה.',
     staffUnavailable: 'כניסת צוות דורשת חיבור ל־Airtable וטבלת Staff עם סיסמאות מוצפנות (האש).',
     registerToggle: 'יצירת משתמש צוות (הקמה)',
     registerTitle: 'רישום משתמש צוות',
@@ -64,6 +70,7 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [staffError, setStaffError] = useState('');
   const [staffSubmitting, setStaffSubmitting] = useState(false);
 
@@ -71,6 +78,7 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
   const [regName, setRegName] = useState('');
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [regPasswordVisible, setRegPasswordVisible] = useState(false);
   const [regSecret, setRegSecret] = useState('');
   const [regMessage, setRegMessage] = useState('');
   const [regError, setRegError] = useState('');
@@ -143,17 +151,28 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
             </label>
             <label className="field">
               <span>{t.password}</span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-                required
-              />
+              <div className="password-input-wrap">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? t.hidePassword : t.showPassword}
+                >
+                  {showPassword ? t.hidePassword : t.showPassword}
+                </button>
+              </div>
             </label>
             <button className="button" type="submit" disabled={staffSubmitting}>
               {staffSubmitting ? t.signingIn : t.signIn}
             </button>
+            <p className="muted" style={{ fontSize: 12, margin: 0 }}>{t.forgotPassword}</p>
             {staffError ? <p className="muted text-feedback-error">{staffError}</p> : null}
           </form>
         ) : null}
@@ -181,7 +200,24 @@ export function LoginForm({ nextPath = '/office/active', staffLoginAvailable, re
                 </label>
                 <label className="field">
                   <span>{t.regPassword}</span>
-                  <input type="password" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} required minLength={10} autoComplete="new-password" />
+                  <div className="password-input-wrap">
+                    <input
+                      type={regPasswordVisible ? 'text' : 'password'}
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      required
+                      minLength={10}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="password-toggle"
+                      onClick={() => setRegPasswordVisible((v) => !v)}
+                      aria-label={regPasswordVisible ? t.hidePassword : t.showPassword}
+                    >
+                      {regPasswordVisible ? t.hidePassword : t.showPassword}
+                    </button>
+                  </div>
                 </label>
                 <label className="field">
                   <span>{t.regSecret}</span>

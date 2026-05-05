@@ -93,6 +93,15 @@ function GlobeIcon() {
   );
 }
 
+function UserIcon() {
+  return (
+    <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
 function LogOutIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.65 }}>
@@ -111,6 +120,7 @@ const primaryNav = [
 ];
 
 const secondaryNav = [
+  { href: '/office/account', label: 'החשבון שלי', Icon: UserIcon },
   { href: '/docs', label: 'תיעוד', Icon: FileTextIcon },
   { href: '/connections', label: 'חיבורים', Icon: LinkIcon },
   { href: '/', label: 'אתר לקוחות', Icon: GlobeIcon, exact: true },

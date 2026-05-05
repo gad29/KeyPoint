@@ -1,7 +1,23 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FinanceTransactionRow } from '@/lib/airtable-finance';
+
+type StaffRow = {
+  recordId: string;
+  email: string;
+  fullName: string;
+  active: boolean;
+  role: string;
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  advisor: 'יועץ',
+  admin: 'אדמין',
+  secretary: 'מזכירה',
+  reception: 'קבלה',
+  viewer: 'צפייה בלבד',
+};
 
 const VAT_RATE = 0.17;
 
@@ -61,9 +77,69 @@ export function AdminDashboardClient({
     password: '',
     role: 'secretary',
   });
+  const [showWorkerPassword, setShowWorkerPassword] = useState(false);
   const [savingWorker, setSavingWorker] = useState(false);
   const [workerMessage, setWorkerMessage] = useState('');
   const [workerError, setWorkerError] = useState('');
+
+  // Staff list + reset password
+  const [staffList, setStaffList] = useState<StaffRow[]>([]);
+  const [loadingStaff, setLoadingStaff] = useState(false);
+  const [resetTarget, setResetTarget] = useState<StaffRow | null>(null);
+  const [resetPassword, setResetPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetError, setResetError] = useState('');
+
+  const loadStaff = useCallback(async () => {
+    setLoadingStaff(true);
+    try {
+      const res = await fetch('/api/admin/staff');
+      const json = await res.json() as { ok: boolean; data?: StaffRow[] };
+      if (json.ok && json.data) setStaffList(json.data);
+    } finally {
+      setLoadingStaff(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'staff') void loadStaff();
+  }, [activeTab, loadStaff]);
+
+  async function submitReset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!resetTarget) return;
+    setResetError('');
+    setResetMessage('');
+    if (resetPassword.length < 10) {
+      setResetError('הסיסמה חייבת להכיל לפחות 10 תווים');
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      const res = await fetch(`/api/admin/staff/${resetTarget.recordId}/password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: resetPassword }),
+      });
+      const json = await res.json() as { ok: boolean; error?: string };
+      if (json.ok) {
+        setResetMessage(`הסיסמה של ${resetTarget.email} עודכנה ✓`);
+        setResetPassword('');
+        setTimeout(() => {
+          setResetTarget(null);
+          setResetMessage('');
+        }, 1500);
+      } else {
+        setResetError(json.error || 'איפוס הסיסמה נכשל');
+      }
+    } catch {
+      setResetError('שגיאה בחיבור לשרת');
+    } finally {
+      setResettingPassword(false);
+    }
+  }
 
   // Receipt form state
   const [receipt, setReceipt] = useState({
@@ -175,9 +251,10 @@ export function AdminDashboardClient({
       });
       const json = await res.json() as { ok: boolean; error?: string; data?: { email: string; role: string } };
       if (json.ok && json.data) {
-        const roleLabel = json.data.role === 'secretary' ? 'מזכירה' : json.data.role === 'admin' ? 'אדמין' : json.data.role === 'advisor' ? 'יועץ' : json.data.role;
+        const roleLabel = ROLE_LABELS[json.data.role] || json.data.role;
         setWorkerMessage(`המשתמש ${json.data.email} נוצר בהצלחה (${roleLabel}) ✓`);
         setWorker({ fullName: '', email: '', password: '', role: 'secretary' });
+        void loadStaff();
       } else {
         setWorkerError(json.error || 'יצירת המשתמש נכשלה');
       }
@@ -500,14 +577,24 @@ export function AdminDashboardClient({
               </label>
               <label className="field">
                 <span>סיסמה (לפחות 10 תווים) *</span>
-                <input
-                  type="password"
-                  value={worker.password}
-                  onChange={(e) => setWorker((w) => ({ ...w, password: e.target.value }))}
-                  required
-                  minLength={10}
-                  autoComplete="new-password"
-                />
+                <div className="password-input-wrap">
+                  <input
+                    type={showWorkerPassword ? 'text' : 'password'}
+                    value={worker.password}
+                    onChange={(e) => setWorker((w) => ({ ...w, password: e.target.value }))}
+                    required
+                    minLength={10}
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    onClick={() => setShowWorkerPassword((v) => !v)}
+                    aria-label={showWorkerPassword ? 'הסתר' : 'הצג'}
+                  >
+                    {showWorkerPassword ? 'הסתר' : 'הצג'}
+                  </button>
+                </div>
               </label>
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
@@ -527,6 +614,139 @@ export function AdminDashboardClient({
               <strong>מזכירה</strong> מקבלת גישה ל-/office בלבד. <strong>יועץ/אדמין</strong> מקבלים גם /admin.
             </p>
           </form>
+
+          {/* Existing staff list */}
+          <div style={{ borderTop: '1px solid var(--line)', marginTop: 28, paddingTop: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+              <p className="eyebrow" style={{ margin: 0 }}>אנשי צוות קיימים</p>
+              <button
+                type="button"
+                className="button button-secondary button-compact"
+                onClick={() => void loadStaff()}
+                disabled={loadingStaff}
+              >
+                {loadingStaff ? '…' : 'רענן'}
+              </button>
+            </div>
+
+            {staffList.length === 0 && !loadingStaff && (
+              <p className="muted" style={{ fontSize: 13 }}>
+                אין משתמשים נוספים עדיין. הוסף איש צוות בטופס למעלה.
+              </p>
+            )}
+
+            {staffList.length > 0 && (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>שם</th>
+                      <th>אימייל</th>
+                      <th>תפקיד</th>
+                      <th>סטטוס</th>
+                      <th>פעולות</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {staffList.map((s) => (
+                      <tr key={s.recordId}>
+                        <td>{s.fullName || '—'}</td>
+                        <td style={{ direction: 'ltr', textAlign: 'right' }}>{s.email}</td>
+                        <td>
+                          <span className="badge" style={{ fontSize: 12 }}>
+                            {ROLE_LABELS[s.role] || s.role}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${s.active ? 'good' : 'danger'}`} style={{ fontSize: 12 }}>
+                            {s.active ? 'פעיל' : 'מושבת'}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="button button-secondary button-compact"
+                            onClick={() => {
+                              setResetTarget(s);
+                              setResetPassword('');
+                              setResetError('');
+                              setResetMessage('');
+                            }}
+                          >
+                            איפוס סיסמה
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Reset password modal */}
+          {resetTarget && (
+            <div
+              className="modal-backdrop"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setResetTarget(null);
+              }}
+            >
+              <div className="modal-card">
+                <p className="eyebrow" style={{ marginBottom: 4 }}>איפוס סיסמה</p>
+                <h3 style={{ margin: '0 0 4px' }}>{resetTarget.fullName || resetTarget.email}</h3>
+                <p className="muted" style={{ fontSize: 13, marginBottom: 16, direction: 'ltr', textAlign: 'right' }}>
+                  {resetTarget.email}
+                </p>
+
+                <form onSubmit={(e) => void submitReset(e)} className="grid" style={{ gap: 12 }}>
+                  <label className="field">
+                    <span>סיסמה חדשה (לפחות 10 תווים) *</span>
+                    <div className="password-input-wrap">
+                      <input
+                        type={showResetPassword ? 'text' : 'password'}
+                        value={resetPassword}
+                        onChange={(e) => setResetPassword(e.target.value)}
+                        autoComplete="new-password"
+                        minLength={10}
+                        autoFocus
+                        required
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowResetPassword((v) => !v)}
+                        aria-label={showResetPassword ? 'הסתר' : 'הצג'}
+                      >
+                        {showResetPassword ? 'הסתר' : 'הצג'}
+                      </button>
+                    </div>
+                  </label>
+
+                  <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                    יש להעביר את הסיסמה החדשה לעובד באופן בטוח (וואטסאפ / שיחה). הוא יוכל לשנות אותה מ&quot;החשבון שלי&quot; אחרי הכניסה.
+                  </p>
+
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="button button-secondary"
+                      onClick={() => setResetTarget(null)}
+                      disabled={resettingPassword}
+                    >
+                      ביטול
+                    </button>
+                    <button className="button" type="submit" disabled={resettingPassword}>
+                      {resettingPassword ? 'מאפס…' : 'איפוס סיסמה'}
+                    </button>
+                  </div>
+
+                  {resetMessage && <p className="text-feedback-success" style={{ fontSize: 14, margin: 0 }}>{resetMessage}</p>}
+                  {resetError && <p className="text-feedback-error" style={{ fontSize: 14, margin: 0 }}>{resetError}</p>}
+                </form>
+              </div>
+            </div>
+          )}
         </section>
       )}
     </div>
