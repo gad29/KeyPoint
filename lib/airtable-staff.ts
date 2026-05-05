@@ -87,6 +87,7 @@ export async function createStaffInAirtable(input: {
   email: string;
   passwordHash: string;
   fullName?: string;
+  role?: string;
 }): Promise<ActionResult<{ id: string }>> {
   if (!hasAirtableConfig()) {
     return { ok: false, error: 'Airtable is not configured' };
@@ -97,7 +98,7 @@ export async function createStaffInAirtable(input: {
     [EMAIL_FIELDS[0]]: input.email.trim().toLowerCase(),
     [HASH_FIELDS[0]]: input.passwordHash,
     [ACTIVE_FIELDS[0]]: true,
-    [ROLE_FIELDS[0]]: 'advisor',
+    [ROLE_FIELDS[0]]: normalizeStaffRole(input.role),
   };
   if (input.fullName?.trim()) {
     fields[NAME_FIELDS[0]] = input.fullName.trim();

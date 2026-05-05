@@ -51,8 +51,19 @@ export function AdminDashboardClient({
   const [summary, setSummary] = useState(initialSummary);
   const [rows, setRows] = useState(initialRows);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'summary' | 'transactions' | 'receipt' | 'add'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'transactions' | 'receipt' | 'add' | 'staff'>('summary');
   const [toast, setToast] = useState('');
+
+  // Add staff worker form state
+  const [worker, setWorker] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    role: 'secretary',
+  });
+  const [savingWorker, setSavingWorker] = useState(false);
+  const [workerMessage, setWorkerMessage] = useState('');
+  const [workerError, setWorkerError] = useState('');
 
   // Receipt form state
   const [receipt, setReceipt] = useState({
@@ -138,6 +149,45 @@ export function AdminDashboardClient({
     }
   }
 
+  async function addWorker(e: React.FormEvent) {
+    e.preventDefault();
+    setWorkerError('');
+    setWorkerMessage('');
+    if (!worker.email || !worker.password) {
+      setWorkerError('יש למלא אימייל וסיסמה');
+      return;
+    }
+    if (worker.password.length < 10) {
+      setWorkerError('הסיסמה חייבת להכיל לפחות 10 תווים');
+      return;
+    }
+    setSavingWorker(true);
+    try {
+      const res = await fetch('/api/admin/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: worker.email.trim().toLowerCase(),
+          password: worker.password,
+          fullName: worker.fullName.trim() || undefined,
+          role: worker.role,
+        }),
+      });
+      const json = await res.json() as { ok: boolean; error?: string; data?: { email: string; role: string } };
+      if (json.ok && json.data) {
+        const roleLabel = json.data.role === 'secretary' ? 'מזכירה' : json.data.role === 'admin' ? 'אדמין' : json.data.role === 'advisor' ? 'יועץ' : json.data.role;
+        setWorkerMessage(`המשתמש ${json.data.email} נוצר בהצלחה (${roleLabel}) ✓`);
+        setWorker({ fullName: '', email: '', password: '', role: 'secretary' });
+      } else {
+        setWorkerError(json.error || 'יצירת המשתמש נכשלה');
+      }
+    } catch {
+      setWorkerError('שגיאה בחיבור לשרת');
+    } finally {
+      setSavingWorker(false);
+    }
+  }
+
   async function addTransaction(e: React.FormEvent) {
     e.preventDefault();
     if (!tx.amount) { setToast('יש להזין סכום'); return; }
@@ -202,7 +252,7 @@ export function AdminDashboardClient({
 
       {/* Tabs */}
       <div className="tab-bar">
-        {([['summary', 'סיכום חודשי'], ['transactions', 'תנועות'], ['receipt', 'חשבונית מס קבלה'], ['add', 'הוספת תנועה']] as const).map(([id, label]) => (
+        {([['summary', 'סיכום חודשי'], ['transactions', 'תנועות'], ['receipt', 'חשבונית מס קבלה'], ['add', 'הוספת תנועה'], ['staff', 'צוות']] as const).map(([id, label]) => (
           <button key={id} type="button" className={`tab ${activeTab === id ? 'active' : ''}`} onClick={() => setActiveTab(id)}>
             {label}
           </button>
@@ -406,6 +456,76 @@ export function AdminDashboardClient({
                 <span className={toast.includes('שגיאה') ? 'text-feedback-error' : 'muted'} style={{ fontSize: 14 }}>{toast}</span>
               )}
             </div>
+          </form>
+        </section>
+      )}
+
+      {/* Tab: Add staff worker */}
+      {activeTab === 'staff' && (
+        <section className="card">
+          <p className="eyebrow" style={{ marginBottom: 4 }}>הוספת איש צוות</p>
+          <p className="muted" style={{ fontSize: 13, marginBottom: 20 }}>
+            יצירת משתמש חדש למזכירה, יועץ או אדמין. המשתמש נשמר אוטומטית בטבלת Staff ב-Airtable עם תפקיד וסיסמה מוצפנת (bcrypt).
+          </p>
+          <form onSubmit={(e) => void addWorker(e)}>
+            <div className="form-grid cols-2">
+              <label className="field">
+                <span>שם מלא</span>
+                <input
+                  value={worker.fullName}
+                  onChange={(e) => setWorker((w) => ({ ...w, fullName: e.target.value }))}
+                  placeholder="שרה כהן"
+                />
+              </label>
+              <label className="field">
+                <span>תפקיד *</span>
+                <select value={worker.role} onChange={(e) => setWorker((w) => ({ ...w, role: e.target.value }))}>
+                  <option value="secretary">מזכירה</option>
+                  <option value="advisor">יועץ</option>
+                  <option value="admin">אדמין</option>
+                  <option value="reception">קבלה</option>
+                  <option value="viewer">צפייה בלבד</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>אימייל *</span>
+                <input
+                  type="email"
+                  value={worker.email}
+                  onChange={(e) => setWorker((w) => ({ ...w, email: e.target.value }))}
+                  placeholder="sarah@example.com"
+                  required
+                  autoComplete="off"
+                />
+              </label>
+              <label className="field">
+                <span>סיסמה (לפחות 10 תווים) *</span>
+                <input
+                  type="password"
+                  value={worker.password}
+                  onChange={(e) => setWorker((w) => ({ ...w, password: e.target.value }))}
+                  required
+                  minLength={10}
+                  autoComplete="new-password"
+                />
+              </label>
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+              <button className="button" type="submit" disabled={savingWorker}>
+                {savingWorker ? 'יוצר…' : 'הוסף משתמש'}
+              </button>
+              {workerMessage && (
+                <span className="text-feedback-success" style={{ fontSize: 14 }}>{workerMessage}</span>
+              )}
+              {workerError && (
+                <span className="text-feedback-error" style={{ fontSize: 14 }}>{workerError}</span>
+              )}
+            </div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 16 }}>
+              הסיסמה מוצפנת לפני השמירה. המשתמש יוכל להתחבר מיד דרך מסך הכניסה הרגיל.
+              <br />
+              <strong>מזכירה</strong> מקבלת גישה ל-/office בלבד. <strong>יועץ/אדמין</strong> מקבלים גם /admin.
+            </p>
           </form>
         </section>
       )}
