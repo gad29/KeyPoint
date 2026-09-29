@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAdvisorFinanceAccess } from '@/lib/admin-auth';
-import { listRecentFinanceTransactions, summarizeTransactions } from '@/lib/airtable-finance';
+import { getStore } from '@/lib/data';
+import { summarizeTransactions } from '@/lib/data/finance';
 
 export async function GET() {
   const gate = await requireAdvisorFinanceAccess();
@@ -8,7 +9,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
   }
 
-  const txs = await listRecentFinanceTransactions();
+  const txs = await getStore().listRecentFinanceTransactions();
   if (!txs.ok) {
     return NextResponse.json({ ok: false, error: txs.error }, { status: 502 });
   }

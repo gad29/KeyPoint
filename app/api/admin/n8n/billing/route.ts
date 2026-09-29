@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdvisorFinanceAccess } from '@/lib/admin-auth';
-import { logBillingEventToAirtable } from '@/lib/airtable-finance';
+import { getStore } from '@/lib/data';
 import { triggerN8n } from '@/lib/n8n';
 
 const KIND_TO_PATH: Record<string, string> = {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
   };
 
   const n8n = await triggerN8n(path, payload);
-  const log = await logBillingEventToAirtable({
+  const log = await getStore().logBillingEvent({
     kind,
     targetEmail,
     caseId: payload.caseId,
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       {
         ok: false,
         error: n8n.error || 'n8n request failed',
-        meta: { airtableLogOk: log.ok },
+        meta: { logOk: log.ok },
       },
       { status: 502 },
     );
@@ -76,6 +76,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    meta: { airtableLogOk: log.ok, airtableLogError: log.ok ? undefined : log.error },
+    meta: { logOk: log.ok, logError: log.ok ? undefined : log.error },
   });
 }

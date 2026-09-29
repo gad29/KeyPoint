@@ -1,0 +1,17 @@
+# Local development database. Production uses Supabase or any managed Postgres via DATABASE_URL.
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: agency-os-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agencyos
+      POSTGRES_PASSWORD: agencyos-local
+      POSTGRES_DB: agencyos
+    ports:
+      - "5546:5432"
+    volumes:
+      - agency-os-pgdata:/var/lib/postgresql/data
+
+volumes:
+  agency-os-pgdata:

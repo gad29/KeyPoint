@@ -1,5 +1,5 @@
 import { OfficePageClient } from '@/components/office-page';
-import { hasAirtableConfig } from '@/lib/env';
+import { hasLiveDataStore } from '@/lib/env';
 import { filterCasesByBucket } from '@/lib/office-buckets';
 import { listBankOffers, listCases } from '@/lib/repository';
 
@@ -12,5 +12,5 @@ export default async function OfficeCompletedPage() {
     await Promise.all(cases.map(async (item) => [item.id, await listBankOffers(item.id)])),
   ) as Record<string, Awaited<ReturnType<typeof listBankOffers>>>;
 
-  return <OfficePageClient cases={cases} offersByCase={offersByCase} liveMode={hasAirtableConfig()} bucket="completed" />;
+  return <OfficePageClient cases={cases} offersByCase={offersByCase} liveMode={hasLiveDataStore()} bucket="completed" />;
 }

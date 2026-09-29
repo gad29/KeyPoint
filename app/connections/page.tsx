@@ -2,6 +2,9 @@ import {
   env,
   hasAiReviewConfig,
   hasAirtableConfig,
+  getDataBackend,
+  hasDatabaseConfig,
+  hasLiveDataStore,
   hasEmailConfig,
   hasGoogleConfig,
   hasLiveAppBaseUrl,
@@ -14,6 +17,9 @@ import {
   isLocalUploadMode,
   looksLikePlaceholder,
 } from '@/lib/env';
+
+// Reads preset/business/backend settings from the runtime environment.
+export const dynamic = 'force-dynamic';
 
 type Status = 'good' | 'warn' | 'danger';
 
@@ -66,10 +72,24 @@ function buildChecks(): Array<{ title: string; items: Check[] }> {
       title: 'System of record + automation',
       items: [
         {
+          label: 'Data backend',
+          status: hasLiveDataStore() ? 'good' : 'warn',
+          value: getDataBackend(),
+          note: hasLiveDataStore()
+            ? 'Cases, staff and finance are stored live.'
+            : 'Demo mode: data lives in a local JSON file. Set DATABASE_URL (Postgres/Supabase) or Airtable keys to go live.',
+        },
+        {
+          label: 'Postgres / Supabase',
+          status: hasDatabaseConfig() ? 'good' : 'warn',
+          value: hasDatabaseConfig() ? hostLabel(env.databaseUrl) : 'Not set',
+          note: hasDatabaseConfig() ? 'Run npm run db:migrate after each deploy that adds migrations.' : 'Optional. Recommended system of record.',
+        },
+        {
           label: 'Airtable',
-          status: hasAirtableConfig() ? 'good' : 'danger',
-          value: hasAirtableConfig() ? 'Configured' : 'Missing',
-          note: hasAirtableConfig() ? 'Live case creation/loading is available.' : 'Cases cannot be created live until Airtable is configured.',
+          status: hasAirtableConfig() ? 'good' : 'warn',
+          value: hasAirtableConfig() ? 'Configured' : 'Not set',
+          note: hasAirtableConfig() ? 'Available as a backend (DATA_BACKEND=airtable) or when no database is set.' : 'Optional.',
         },
         {
           label: 'n8n',
@@ -148,7 +168,7 @@ export default function ConnectionsPage() {
   const readyCount = flat.filter((item) => item.status === 'good').length;
   const warnCount = flat.filter((item) => item.status === 'warn').length;
   const dangerCount = flat.filter((item) => item.status === 'danger').length;
-  const likelyGoLiveReady = hasAirtableConfig() && hasPortalInviteSecret() && hasN8nConfig() && hasWhatsappConfig();
+  const likelyGoLiveReady = hasLiveDataStore() && hasPortalInviteSecret() && hasN8nConfig() && hasWhatsappConfig();
 
   return (
     <div className="grid">

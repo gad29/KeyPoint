@@ -1,58 +1,18 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { sampleCases, sampleOffers, documentLibrary, type BankOffer, type CaseRecord, type CaseStage } from '@/data/domain';
-import { env, hasAirtableConfig, hasN8nConfig } from '@/lib/env';
-import {
-  createAirtableActivityLog,
-  createAirtableAiReviewStub,
-  createAirtableBankRun,
-  createAirtableCase,
-  createAirtableCaseDocument,
-  getAirtableCaseByCaseId,
-  listAirtableBankRuns,
-  listAirtableCaseDocuments,
-  listAirtableCases,
-  updateAirtableCase,
-  updateAirtableCaseDocumentStatus,
-  updateAirtablePortalStatus,
-} from '@/lib/airtable';
+import type { BankOffer, CaseRecord, CaseStage } from '@/data/domain';
+import { env, hasLiveDataStore, hasN8nConfig } from '@/lib/env';
+import { getStore, type CaseContactInput } from '@/lib/data';
+import { getActivePreset } from '@/lib/presets';
 import { postJson, triggerN8n } from '@/lib/n8n';
 import type { CaseUpdateInput, CreateBankOfferInput, CreateCaseInput, PortalInvite, UploadRecord } from '@/lib/types';
 
 const appRoot = process.cwd();
-const dataRoot = path.join(appRoot, 'data');
-const uploadsFile = path.join(dataRoot, 'uploads.json');
 
 function logRepository(level: 'info' | 'warn' | 'error', message: string, details?: Record<string, unknown>) {
   const payload = details ? ` ${JSON.stringify(details)}` : '';
   const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info;
-  logger(`[KeyPoint Repository] ${message}${payload}`);
-}
-
-function ensureJsonFile(filePath: string, defaultValue: unknown) {
-  if (!fs.existsSync(filePath)) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(defaultValue, null, 2));
-  }
-}
-
-function readJson<T>(filePath: string, fallback: T): T {
-  ensureJsonFile(filePath, fallback);
-  return JSON.parse(fs.readFileSync(filePath, 'utf8')) as T;
-}
-
-function writeJson(filePath: string, value: unknown) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const serialized = JSON.stringify(value, null, 2);
-  const tmp = `${filePath}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, serialized);
-  try {
-    fs.renameSync(tmp, filePath);
-  } catch {
-    fs.copyFileSync(tmp, filePath);
-    fs.unlinkSync(tmp);
-  }
+  logger(`[AgencyOS Repository] ${message}${payload}`);
 }
 
 function base64url(input: string) {
@@ -101,20 +61,30 @@ function parseInviteToken(token: string): Omit<PortalInvite, 'token'> | null {
 
 function getStageSummary(stage: CaseStage) {
   switch (stage) {
+    case 'invited':
+    case 'onboarding':
     case 'intake-submitted':
     case 'approved':
     case 'portal-activated':
     case 'documents-in-progress':
     case 'secretary-review':
       return { phase: 'intake-complete', note: 'Intake and document collection are being reviewed.' };
+    case 'in-service':
+      return { phase: 'in-service', note: 'The work is in progress.' };
     case 'waiting-appraiser':
     case 'appraisal-received':
       return { phase: 'appraisal-property-docs', note: 'Property and appraisal work is in progress.' };
     case 'ready-for-bank':
     case 'bank-negotiation':
     case 'recommendation-prepared':
-    case 'completed':
       return { phase: 'advisor-bank-offers', note: 'Advisor and bank-offer work is underway.' };
+    case 'invoice-sent':
+    case 'overdue':
+      return { phase: 'billing', note: 'The invoice has been issued and payment is pending.' };
+    case 'paid':
+    case 'completed':
+    case 'archived':
+      return { phase: 'completed', note: 'The engagement is complete.' };
     default:
       return { phase: 'intake-complete', note: 'The case has been opened and is waiting for the next action.' };
   }
@@ -184,12 +154,12 @@ async function triggerOfferComparison(caseId: string) {
 }
 
 async function triggerStageReview(caseRecord: CaseRecord) {
-  const offers = await listBankOffers(caseRecord.id);
+  const offers = getActivePreset().features.bankOffers ? await listBankOffers(caseRecord.id) : [];
   const payload = buildAnonymizedReviewPayload(caseRecord, offers);
   const payloadRef = `stage-review:${caseRecord.id}:${Date.now()}`;
 
-  if (hasAirtableConfig()) {
-    const stub = await createAirtableAiReviewStub(caseRecord.id, caseRecord.stage, payloadRef);
+  if (hasLiveDataStore()) {
+    const stub = await getStore().createAiReviewStub(caseRecord.id, caseRecord.stage, payloadRef);
     if (!stub.ok) {
       logRepository('warn', 'AI review stub could not be created', { caseId: caseRecord.id, error: stub.error });
     }
@@ -207,7 +177,7 @@ async function triggerStageReview(caseRecord: CaseRecord) {
 }
 
 async function safeActivityLog(caseId: string, eventType: string, summary: string, actor?: string) {
-  const result = await createAirtableActivityLog(caseId, eventType, summary, actor);
+  const result = await getStore().logActivity(caseId, eventType, summary, actor);
   if (!result.ok) {
     logRepository('warn', 'Activity log write failed', { caseId, eventType, error: result.error });
   }
@@ -215,37 +185,22 @@ async function safeActivityLog(caseId: string, eventType: string, summary: strin
 }
 
 export async function listCases(): Promise<CaseRecord[]> {
-  if (!hasAirtableConfig()) return sampleCases;
-
-  const airtable = await listAirtableCases();
-  if (airtable.ok && airtable.data) {
-    return airtable.data;
-  }
-
-  logRepository('warn', 'Falling back to empty live case list because Airtable listing failed', { error: airtable.error });
+  const result = await getStore().listCases();
+  if (result.ok && result.data) return result.data;
+  logRepository('warn', 'Falling back to empty case list because listing failed', { error: result.error });
   return [];
 }
 
 export async function getCase(caseId: string): Promise<CaseRecord | undefined> {
-  if (hasAirtableConfig()) {
-    const airtable = await getAirtableCaseByCaseId(caseId);
-    if (airtable.ok && airtable.data) return airtable.data;
-    logRepository('warn', 'Live case lookup failed', { caseId, error: airtable.error });
-    return undefined;
-  }
-
-  return sampleCases.find((item) => item.id === caseId);
+  const result = await getStore().getCase(caseId);
+  return result.ok ? result.data : undefined;
 }
 
 export async function createCase(input: CreateCaseInput) {
-  if (!hasAirtableConfig()) {
-    return { ok: false, error: 'Airtable must be configured to create live cases' } as const;
-  }
-
-  const created = await createAirtableCase(input);
+  const created = await getStore().createCase(input);
   if (!created.ok || !created.data) return created;
 
-  await safeActivityLog(created.data.id, 'case-created', 'Case created from KeyPoint app');
+  await safeActivityLog(created.data.id, 'case-created', 'Case created from Agency OS app');
   const alertResult = await triggerOfficeAlert('secretary-alert', {
     caseId: created.data.id,
     leadName: created.data.leadName,
@@ -263,12 +218,62 @@ export async function createCase(input: CreateCaseInput) {
   return created;
 }
 
-export async function updateCase(caseId: string, input: CaseUpdateInput) {
-  if (!hasAirtableConfig()) {
-    return { ok: false, error: 'Airtable must be configured to update case data' } as const;
+export interface CreateIntakeCaseInput extends CreateCaseInput {
+  answers?: unknown;
+  contacts: CaseContactInput[];
+  requiredDocumentCodes: string[];
+}
+
+/**
+ * Public intake flow shared by every preset: create the case, attach the people,
+ * seed the required-document checklist, and log it. Secondary writes are
+ * best-effort; their failures come back as warnings instead of failing the intake.
+ */
+export async function createIntakeCase(input: CreateIntakeCaseInput) {
+  const store = getStore();
+  const { contacts, requiredDocumentCodes, ...caseInput } = input;
+  const created = await store.createCase({
+    ...caseInput,
+    missingItemsCount: requiredDocumentCodes.length,
+    portalStatus: 'pending-office-approval',
+    nextAction: 'Review intake, approve the case, and send the client progress link.',
+  });
+
+  if (!created.ok || !created.data) {
+    return { ok: false as const, error: created.error || 'Failed to create case' };
   }
 
-  const updated = await updateAirtableCase(caseId, input);
+  const caseId = created.data.id;
+  const warnings: string[] = [];
+  let contactsCreated = 0;
+
+  for (const contact of contacts) {
+    const result = await store.addCaseContact(caseId, contact);
+    if (result.ok) contactsCreated += 1;
+    else warnings.push(result.error || 'Contact creation failed');
+  }
+
+  const seeded = await store.seedCaseDocuments(caseId, requiredDocumentCodes);
+  if (!seeded.ok) warnings.push(seeded.error || 'Document checklist seeding failed');
+
+  const activity = await store.logActivity(caseId, 'intake_received', 'Intake captured and case seeded', 'system');
+  if (!activity.ok) warnings.push(activity.error || 'Activity log creation failed');
+
+  if (warnings.length) logRepository('warn', 'Intake created with warnings', { caseId, warnings });
+
+  return {
+    ok: true as const,
+    data: created.data,
+    meta: { requiredDocumentCodes, clientsCreated: contactsCreated, warnings },
+  };
+}
+
+export async function findCaseByApplicantIdNumber(idNumber: string) {
+  return getStore().findCaseByContactIdNumber(idNumber);
+}
+
+export async function updateCase(caseId: string, input: CaseUpdateInput) {
+  const updated = await getStore().updateCase(caseId, input);
   if (!updated.ok || !updated.data) return updated;
 
   const activityParts = [
@@ -310,7 +315,8 @@ export async function getCaseChecklist(caseId: string) {
   const caseRecord = await getCase(caseId);
   if (!caseRecord) return [];
 
-  return documentLibrary.map((doc) => ({
+  const library = getActivePreset().documentLibrary ?? [];
+  return library.map((doc) => ({
     ...doc,
     required:
       (!doc.caseTypes || doc.caseTypes.includes(caseRecord.caseType)) &&
@@ -326,13 +332,11 @@ export async function createInvite(caseId: string): Promise<PortalInvite> {
   const parsed = parseInviteToken(token);
   if (!parsed) throw new Error('Failed to create invite token');
 
-  if (hasAirtableConfig()) {
-    const portalStatusResult = await updateAirtablePortalStatus(caseId, 'invited');
-    if (!portalStatusResult.ok) {
-      logRepository('warn', 'Portal status update failed after invite generation', { caseId, error: portalStatusResult.error });
-    }
-    await safeActivityLog(caseId, 'portal-invite-generated', 'Client progress link generated');
+  const portalStatusResult = await getStore().updateCase(caseId, { portalStatus: 'invited' });
+  if (!portalStatusResult.ok) {
+    logRepository('warn', 'Portal status update failed after invite generation', { caseId, error: portalStatusResult.error });
   }
+  await safeActivityLog(caseId, 'portal-invite-generated', 'Client progress link generated');
 
   return { token, ...parsed };
 }
@@ -354,30 +358,30 @@ export async function getInvite(token: string): Promise<PortalInvite | undefined
 }
 
 export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>) {
-  const uploads = readJson<UploadRecord[]>(uploadsFile, []);
+  const store = getStore();
   const record: UploadRecord = {
     id: crypto.randomUUID(),
     uploadedAt: new Date().toISOString(),
     ...input,
   };
 
-  uploads.unshift(record);
-  writeJson(uploadsFile, uploads);
+  const recorded = await store.recordUpload(record);
+  if (!recorded.ok) {
+    logRepository('warn', 'Upload file saved but upload record failed', { caseId: record.caseId, error: recorded.error });
+  }
 
   let caseDocumentRecordId = '';
-  if (hasAirtableConfig()) {
-    const createdDocument = await createAirtableCaseDocument(record.caseId, record.documentCode, record.path);
-    if (createdDocument.ok && createdDocument.data?.id) {
-      caseDocumentRecordId = createdDocument.data.id;
-    } else {
-      logRepository('warn', 'Upload saved locally but Airtable case-document row failed', {
-        caseId: record.caseId,
-        documentCode: record.documentCode,
-        error: createdDocument.error,
-      });
-    }
-    await safeActivityLog(record.caseId, 'document-uploaded', `${record.fileName} uploaded for ${record.documentCode}`);
+  const createdDocument = await store.createCaseDocument(record.caseId, record.documentCode, record.path);
+  if (createdDocument.ok && createdDocument.data?.id) {
+    caseDocumentRecordId = createdDocument.data.id;
+  } else {
+    logRepository('warn', 'Upload saved but case-document row failed', {
+      caseId: record.caseId,
+      documentCode: record.documentCode,
+      error: createdDocument.error,
+    });
   }
+  await safeActivityLog(record.caseId, 'document-uploaded', `${record.fileName} uploaded for ${record.documentCode}`);
 
   if (env.n8nWebhookBaseUrl) {
     const caseRecord = await getCase(record.caseId);
@@ -405,27 +409,18 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
 }
 
 export async function listUploads(caseId?: string) {
-  const uploads = readJson<UploadRecord[]>(uploadsFile, []);
-  return caseId ? uploads.filter((item) => item.caseId === caseId) : uploads;
+  return getStore().listUploads(caseId);
 }
 
 export async function listBankOffers(caseId: string): Promise<BankOffer[]> {
-  if (hasAirtableConfig()) {
-    const result = await listAirtableBankRuns(caseId);
-    if (result.ok && result.data) return result.data;
-    logRepository('warn', 'Live bank-offer lookup failed; returning empty list', { caseId, error: result.error });
-    return [];
-  }
-
-  return sampleOffers;
+  const result = await getStore().listBankOffers(caseId);
+  if (result.ok && result.data) return result.data;
+  logRepository('warn', 'Bank-offer lookup failed; returning empty list', { caseId, error: result.error });
+  return [];
 }
 
 export async function createBankOffer(input: CreateBankOfferInput) {
-  if (!hasAirtableConfig()) {
-    return { ok: false, error: 'Airtable must be configured to save bank offers' } as const;
-  }
-
-  const created = await createAirtableBankRun(input);
+  const created = await getStore().createBankOffer(input);
   if (!created.ok) return created;
 
   await safeActivityLog(input.caseId, 'bank-offer-added', `Added ${input.bank} offer (${input.status})`);
@@ -459,24 +454,14 @@ export function getUploadDirectory() {
 }
 
 export async function listCaseDocuments(caseId: string) {
-  if (!hasAirtableConfig()) return [];
-  const result = await listAirtableCaseDocuments(caseId);
+  const result = await getStore().listCaseDocuments(caseId);
   if (result.ok && result.data) return result.data;
-  logRepository('warn', 'Live case document listing failed', { caseId, error: result.error });
+  logRepository('warn', 'Case document listing failed', { caseId, error: result.error });
   return [];
 }
 
-export async function updateCaseDocumentStatus(
-  caseId: string,
-  documentCode: string,
-  status: string,
-  reviewNote?: string,
-) {
-  if (!hasAirtableConfig()) {
-    return { ok: false, error: 'Airtable must be configured to update document status' } as const;
-  }
-
-  const result = await updateAirtableCaseDocumentStatus(caseId, documentCode, status, reviewNote);
+export async function updateCaseDocumentStatus(caseId: string, documentCode: string, status: string, reviewNote?: string) {
+  const result = await getStore().updateCaseDocumentStatus(caseId, documentCode, status, reviewNote);
   if (result.ok) {
     await safeActivityLog(caseId, 'document-status-updated', `Document ${documentCode} → ${status}`);
   }

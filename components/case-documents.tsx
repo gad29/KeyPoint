@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { DocumentRequirement } from '@/data/domain';
-import type { CaseDocumentRecord } from '@/lib/airtable';
+import type { CaseDocumentRecord } from '@/lib/data';
 
 const STATUS_LABELS: Record<string, string> = {
   'not-uploaded': 'לא הועלה',

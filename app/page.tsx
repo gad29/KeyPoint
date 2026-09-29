@@ -2,6 +2,9 @@ import { HomePageClient } from '@/components/home-page';
 import { getActivePreset } from '@/lib/presets';
 import { env } from '@/lib/env';
 
+// Reads preset/business/backend settings from the runtime environment.
+export const dynamic = 'force-dynamic';
+
 export default function HomePage() {
   const preset = getActivePreset();
   return (

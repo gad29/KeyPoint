@@ -1,7 +1,7 @@
 import { env, hasAirtableConfig } from '@/lib/env';
 import type { BankOffer, CaseRecord, CaseStage, CaseType, BorrowerProfile } from '@/data/domain';
 import type { ActionResult, CaseUpdateInput, CreateBankOfferInput, CreateCaseInput } from '@/lib/types';
-import { getRequiredDocumentCodes, type IntakePayload } from '@/lib/intake';
+import type { CaseContactInput, CaseDocumentRecord } from '@/lib/data/types';
 
 const apiBase = 'https://api.airtable.com/v0';
 const metaApiBase = 'https://api.airtable.com/v0/meta/bases';
@@ -119,7 +119,7 @@ const aiReviewFieldAliases = {
 function logAirtable(level: 'info' | 'warn' | 'error', message: string, details?: Record<string, unknown>) {
   const payload = details ? ` ${JSON.stringify(details)}` : '';
   const logger = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info;
-  logger(`[KeyPoint Airtable] ${message}${payload}`);
+  logger(`[AgencyOS Airtable] ${message}${payload}`);
 }
 
 function isString(value: unknown): value is string {
@@ -709,15 +709,6 @@ export async function createAirtableCaseDocument(caseId: string, documentCode: s
   return createAirtableRecord(env.airtableDocumentsTable, mapped.fields);
 }
 
-export interface CaseDocumentRecord {
-  recordId: string;
-  caseId: string;
-  documentCode: string;
-  status: string;
-  uploadedFileUrl?: string;
-  reviewNotes?: string;
-  approvedAt?: string;
-}
 
 export async function listAirtableCaseDocuments(caseId: string): Promise<ActionResult<CaseDocumentRecord[]>> {
   const schema = await getTableSchema(env.airtableDocumentsTable, documentFieldAliases);
@@ -877,14 +868,18 @@ export async function createAirtableAiReviewStub(caseId: string, triggeredBy: st
   }
 }
 
-async function createAirtableClientForCaseRecord(caseId: string, fields: Record<string, unknown>) {
+export async function createAirtableCaseContact(caseId: string, contact: CaseContactInput) {
   const schema = await getTableSchema(env.airtableClientsTable, clientFieldAliases);
   const mapped = buildWriteFields(
     schema,
     clientFieldAliases,
     {
-      ...fields,
       caseLink: caseId,
+      fullName: contact.fullName,
+      idNumber: contact.idNumber || '',
+      preferredLanguage: contact.preferredLanguage || '',
+      whatsappNumber: contact.phone || '',
+      email: contact.email || '',
     },
     { required: ['caseLink', 'fullName'], table: env.airtableClientsTable },
   );
@@ -896,9 +891,8 @@ async function createAirtableClientForCaseRecord(caseId: string, fields: Record<
   return createAirtableRecord(env.airtableClientsTable, mapped.fields);
 }
 
-async function seedAirtableCaseDocumentsForRecord(caseId: string, caseType: CaseType, borrowerProfiles: BorrowerProfile[]) {
+export async function seedAirtableCaseDocuments(caseId: string, documentCodes: string[]) {
   const schema = await getTableSchema(env.airtableDocumentsTable, documentFieldAliases);
-  const documentCodes = getRequiredDocumentCodes(caseType, borrowerProfiles);
 
   const results = await Promise.all(
     documentCodes.map(async (documentCode) => {
@@ -969,79 +963,4 @@ export async function findCaseByApplicantIdNumber(
       stage: caseResult.data.stage,
     },
   };
-}
-
-export async function createNativeIntakeCase(input: CreateCaseInput & { intake: IntakePayload }) {
-  const normalizedCaseType = normalizeCaseType(input.caseType);
-  const normalizedBorrowerProfiles = normalizeBorrowerProfiles(input.borrowerProfiles);
-  const requiredDocumentCodes = getRequiredDocumentCodes(normalizedCaseType, normalizedBorrowerProfiles);
-  const created = await createAirtableCase({
-    ...input,
-    missingItemsCount: requiredDocumentCodes.length,
-    portalStatus: 'pending-office-approval',
-    caseType: normalizedCaseType,
-    borrowerProfiles: normalizedBorrowerProfiles,
-    nextAction: 'Review intake, approve the case, and send the client progress link.',
-  });
-
-  if (!created.ok || !created.data) {
-    return { ok: false, error: created.error || 'Failed to create Airtable case' } as const;
-  }
-
-  const caseRecord = created.data;
-  const caseId = caseRecord.id;
-  const warnings: string[] = [];
-
-  const primaryClient = await createAirtableClientForCaseRecord(caseId, {
-    fullName: input.intake.applicant.fullName.trim(),
-    idNumber: input.intake.applicant.idNumber?.trim() || '',
-    preferredLanguage: input.intake.contact.preferredLanguage,
-    whatsappNumber: input.intake.contact.phone.trim(),
-    email: input.intake.contact.email?.trim() || '',
-  });
-  const primaryClientCreated = primaryClient.ok;
-
-  if (!primaryClient.ok) {
-    warnings.push(primaryClient.error || 'Primary client creation failed');
-    logAirtable('warn', 'Primary client creation failed after case creation', { caseId, error: primaryClient.error });
-  }
-
-  let secondaryClientCreated = false;
-  if (input.intake.coApplicant.hasCoApplicant && input.intake.coApplicant.fullName?.trim()) {
-    const secondaryClient = await createAirtableClientForCaseRecord(caseId, {
-      fullName: input.intake.coApplicant.fullName.trim(),
-      idNumber: input.intake.coApplicant.idNumber?.trim() || '',
-      preferredLanguage: input.intake.contact.preferredLanguage,
-      whatsappNumber: input.intake.contact.phone.trim(),
-      email: input.intake.contact.email?.trim() || '',
-    });
-    secondaryClientCreated = secondaryClient.ok;
-
-    if (!secondaryClient.ok) {
-      warnings.push(secondaryClient.error || 'Co-applicant creation failed');
-      logAirtable('warn', 'Co-applicant creation failed after case creation', { caseId, error: secondaryClient.error });
-    }
-  }
-
-  const seededDocuments = await seedAirtableCaseDocumentsForRecord(caseId, normalizedCaseType, normalizedBorrowerProfiles);
-  if (!seededDocuments.ok) {
-    warnings.push(seededDocuments.error || 'Document checklist seeding failed');
-    logAirtable('warn', 'Document checklist seeding failed after case creation', { caseId, error: seededDocuments.error });
-  }
-
-  const activity = await createAirtableActivityLog(caseId, 'intake_received', 'Native intake captured and case seeded', 'system');
-  if (!activity.ok) {
-    warnings.push(activity.error || 'Activity log creation failed');
-    logAirtable('warn', 'Activity log creation failed after case creation', { caseId, error: activity.error });
-  }
-
-  return {
-    ok: true,
-    data: caseRecord,
-    meta: {
-      requiredDocumentCodes,
-      clientsCreated: Number(primaryClientCreated) + Number(secondaryClientCreated),
-      warnings,
-    },
-  } as const;
 }

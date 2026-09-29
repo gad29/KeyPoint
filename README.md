@@ -35,7 +35,7 @@ Full plan: [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md).
 
 - **Phase 0** ✅ Roadmap committed
 - **Phase 1** ✅ Preset system, generic wizard, invoice/chase scaffolding, mortgage flow preserved as preset
-- **Phase 2** Supabase (Postgres) multi-tenant migration
+- **Phase 2** ✅ Pluggable data layer: Postgres/Supabase (multi-tenant schema), Airtable, or zero-config demo
 - **Phase 3** Onboarding as a real product (templates, e-sign, branded portal)
 - **Phase 4** Billing + chase engine (Stripe first, then iCount / Green Invoice / QuickBooks / Xero)
 - **Phase 5** Polish (unified timeline, teams, WhatsApp/Slack)
@@ -45,7 +45,7 @@ Full plan: [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md).
 - Preset-driven public wizard at `/intake` — generic 3-step for `default`, full 5-step mortgage wizard for `mortgage-advisor`
 - Signed client invite tokens + `/portal/[token]` progress link
 - Office dashboard (`/office/active`, `/stuck`, `/completed`) + case detail with document tracking
-- Airtable-backed data (Phase 2 will replace with Supabase; Airtable stays as an optional export)
+- Data backend of your choice: Postgres/Supabase, Airtable, or a local demo file. See [`docs/database.md`](docs/database.md)
 - `POST /api/uploads` with n8n forwarding
 - Staff auth (bcrypt sessions)
 - Invoice + chase API stubs (`/api/invoices`, `/api/chase`) — Phase 4 wires the adapters end-to-end
@@ -75,11 +75,31 @@ Legacy filename `keypoint.settings.json` is kept for compatibility; Phase 2 will
 
 ## Run locally
 
+With no configuration at all, the app runs in demo mode (local JSON file):
+
 ```bash
 npm install
-npm run apply-settings   # after keypoint.settings.json exists
+```
+
+```bash
 npm run dev
 ```
+
+With a real database (local Docker Postgres, or Supabase via `DATABASE_URL`):
+
+```bash
+npm run db:up
+```
+
+```bash
+npm run db:migrate
+```
+
+```bash
+npm run db:bootstrap -- --email you@business.com
+```
+
+Details: [`docs/database.md`](docs/database.md).
 
 Try the alternate preset:
 
@@ -124,6 +144,7 @@ AGENCY_OS_PRESET=mortgage-advisor npm run dev
 
 - [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md) — the pivot plan
 - [`docs/presets.md`](docs/presets.md) — how to configure or add a preset
+- [`docs/database.md`](docs/database.md) — data backends, Supabase setup, migrations
 - [`docs/integration-checklist.md`](docs/integration-checklist.md)
 - [`docs/automation-implementation.md`](docs/automation-implementation.md)
 - [`docs/n8n-workflows.md`](docs/n8n-workflows.md)

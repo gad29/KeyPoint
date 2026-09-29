@@ -7,6 +7,7 @@ import { CaseTimeline } from '@/components/case-timeline';
 import { CaseDocuments } from '@/components/case-documents';
 import { InviteGenerator } from '@/components/forms/invite-generator';
 import type { PresetFeatures, PresetId } from '@/lib/presets';
+import { GENERIC_STAGE_KEYS, STAGE_LABELS_HE } from '@/lib/stage-labels';
 
 const CASE_TYPE_LABELS: Record<string, string> = {
   'purchase-single-dwelling': 'רכישת דירה יחידה',
@@ -29,32 +30,8 @@ const PROFILE_LABELS: Record<string, string> = {
   'foreign-income': 'הכנסה מחו"ל',
 };
 
-const STAGE_LABELS: Record<string, string> = {
-  'new-lead': 'ליד חדש',
-  'invited': 'הוזמן',
-  'onboarding': 'ממלא טופס',
-  'intake-submitted': 'טופס הוגש',
-  'documents-in-progress': 'מסמכים בתהליך',
-  'in-service': 'בעבודה',
-  'invoice-sent': 'חשבונית נשלחה',
-  'paid': 'שולם',
-  'overdue': 'איחור בתשלום',
-  'completed': 'הושלם',
-  'archived': 'בארכיון',
-  'approved': 'אושר',
-  'portal-activated': 'פורטל הופעל',
-  'secretary-review': 'בדיקת מזכירה',
-  'waiting-appraiser': 'ממתין לשמאי',
-  'appraisal-received': 'שמאות התקבלה',
-  'ready-for-bank': 'מוכן לבנק',
-  'bank-negotiation': 'משא ומתן עם בנק',
-  'recommendation-prepared': 'המלצה מוכנה',
-};
+const STAGE_LABELS: Record<string, string> = STAGE_LABELS_HE;
 
-const GENERIC_STAGE_KEYS = new Set<string>([
-  'new-lead', 'invited', 'onboarding', 'intake-submitted', 'documents-in-progress',
-  'in-service', 'invoice-sent', 'paid', 'overdue', 'completed', 'archived',
-]);
 
 const OFFER_STATUS_LABELS: Record<string, string> = {
   'not-started': 'לא החל',

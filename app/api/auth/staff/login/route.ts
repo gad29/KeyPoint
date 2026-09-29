@@ -1,13 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { findStaffByEmail } from '@/lib/airtable-staff';
+import { getStore } from '@/lib/data';
 import { canUseStaffLogin } from '@/lib/env';
 import { OFFICE_AUTH_COOKIE, officeCookieOptions } from '@/lib/office-auth';
 import { createStaffSessionToken, STAFF_AUTH_COOKIE, staffCookieOptions } from '@/lib/staff-session';
 
 export async function POST(req: NextRequest) {
   if (!canUseStaffLogin()) {
-    return NextResponse.json({ ok: false, error: 'Airtable is not configured' }, { status: 503 });
+    return NextResponse.json({ ok: false, error: 'Staff login needs a database (DATABASE_URL) or Airtable' }, { status: 503 });
   }
 
   let body: { email?: string; password?: string };
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Email and password are required' }, { status: 400 });
   }
 
-  const found = await findStaffByEmail(email);
+  const found = await getStore().findStaffByEmail(email);
   if (!found.ok || !found.data) {
     return NextResponse.json({ ok: false, error: 'Invalid email or password' }, { status: 401 });
   }

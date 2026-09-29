@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listCases, createCase } from '@/lib/repository';
-import { hasAirtableConfig } from '@/lib/env';
-import { createNativeIntakeCase } from '@/lib/airtable';
-import { summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
+import { listCases, createCase, createIntakeCase } from '@/lib/repository';
+import { env, getDataBackend } from '@/lib/env';
+import { getRequiredDocumentCodes, summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
 import { postJson, triggerN8n } from '@/lib/n8n';
-import { env } from '@/lib/env';
 import { currentRequestHasStaffSession } from '@/lib/staff-session';
+import type { CaseContactInput } from '@/lib/data';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -59,7 +58,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    source: hasAirtableConfig() ? 'airtable-or-fallback' : 'local-sample',
+    source: getDataBackend(),
     data: cases,
   });
 }
@@ -96,20 +95,30 @@ export async function POST(req: NextRequest) {
       notesLines.push(`- ${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`);
     }
 
-    const result = await createCase({
+    const result = await createIntakeCase({
       leadName: fullName,
       phone,
-      email: typeof answers.email === 'string' ? answers.email : undefined,
+      email: typeof answers.email === 'string' && answers.email.trim() ? answers.email.trim() : undefined,
       caseType: 'service-engagement',
       borrowerProfiles: [],
       notes: notesLines.join('\n'),
       submissionId,
       stage: 'intake-submitted',
       source: 'generic-intake',
+      answers,
+      contacts: [
+        {
+          fullName,
+          phone,
+          email: typeof answers.email === 'string' ? answers.email.trim() : undefined,
+          role: 'primary',
+        },
+      ],
+      requiredDocumentCodes: [],
     });
 
     if (!result.ok || !result.data) {
-      const errorMessage = 'error' in result ? result.error : 'Failed to create case';
+      const errorMessage = result.error || 'Failed to create case';
       return NextResponse.json(
         { ok: false, error: errorMessage, meta: { source: 'generic-intake', submissionId } },
         { status: 400 },
@@ -147,7 +156,28 @@ export async function POST(req: NextRequest) {
     }
 
     const submissionId = makeNativeIntakeSubmissionId();
-    const result = await createNativeIntakeCase({
+    const contacts: CaseContactInput[] = [
+      {
+        fullName: intake.applicant.fullName.trim(),
+        idNumber: intake.applicant.idNumber?.replace(/\D/g, '') || undefined,
+        preferredLanguage: intake.contact.preferredLanguage,
+        phone: intake.contact.phone.trim(),
+        email: intake.contact.email?.trim() || undefined,
+        role: 'primary',
+      },
+    ];
+    if (intake.coApplicant.hasCoApplicant && intake.coApplicant.fullName?.trim()) {
+      contacts.push({
+        fullName: intake.coApplicant.fullName.trim(),
+        idNumber: intake.coApplicant.idNumber?.replace(/\D/g, '') || undefined,
+        preferredLanguage: intake.contact.preferredLanguage,
+        phone: intake.contact.phone.trim(),
+        email: intake.contact.email?.trim() || undefined,
+        role: 'secondary',
+      });
+    }
+
+    const result = await createIntakeCase({
       leadName: intake.applicant.fullName.trim(),
       spouseName: intake.coApplicant.hasCoApplicant ? intake.coApplicant.fullName?.trim() || undefined : undefined,
       phone: intake.contact.phone.trim(),
@@ -158,7 +188,9 @@ export async function POST(req: NextRequest) {
       submissionId,
       stage: 'intake-submitted',
       source: 'native-intake',
-      intake,
+      answers: intake,
+      contacts,
+      requiredDocumentCodes: getRequiredDocumentCodes(intake.caseType, intake.incomeProfile.borrowerProfiles),
     });
 
     if (!result.ok || !result.data) {

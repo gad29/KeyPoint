@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { findStaffByEmail, updateStaffPasswordHash } from '@/lib/airtable-staff';
+import { getStore } from '@/lib/data';
 import { canUseStaffLogin, looksLikePlaceholder } from '@/lib/env';
 import { getCurrentStaffFromCookies } from '@/lib/staff-session';
 
@@ -13,7 +13,7 @@ const MIN_PASSWORD = 10;
  */
 export async function POST(req: NextRequest) {
   if (!canUseStaffLogin()) {
-    return NextResponse.json({ ok: false, error: 'Airtable is not configured' }, { status: 503 });
+    return NextResponse.json({ ok: false, error: 'Staff login needs a database (DATABASE_URL) or Airtable' }, { status: 503 });
   }
 
   const session = await getCurrentStaffFromCookies();
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'הסיסמה החדשה זהה לסיסמה הנוכחית' }, { status: 400 });
   }
 
-  const staff = await findStaffByEmail(session.email);
+  const staff = await getStore().findStaffByEmail(session.email);
   if (!staff.ok || !staff.data) {
     return NextResponse.json({ ok: false, error: 'לא נמצא משתמש תואם' }, { status: 404 });
   }
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   }
 
   const newHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  const updated = await updateStaffPasswordHash(staff.data.recordId, newHash);
+  const updated = await getStore().updateStaffPasswordHash(staff.data.recordId, newHash);
   if (!updated.ok) {
     return NextResponse.json({ ok: false, error: updated.error || 'עדכון הסיסמה נכשל' }, { status: 502 });
   }

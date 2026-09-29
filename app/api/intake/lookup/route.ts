@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { findCaseByApplicantIdNumber } from '@/lib/airtable';
+import { findCaseByApplicantIdNumber } from '@/lib/repository';
 
 /**
  * Public endpoint used by the intake form to detect whether the entered

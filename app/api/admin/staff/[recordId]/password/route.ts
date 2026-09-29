@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdvisorFinanceAccess } from '@/lib/admin-auth';
-import { updateStaffPasswordHash } from '@/lib/airtable-staff';
+import { getStore } from '@/lib/data';
 import { canUseStaffLogin, looksLikePlaceholder } from '@/lib/env';
 
 const SALT_ROUNDS = 12;
@@ -18,11 +18,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ recordId:
     return NextResponse.json({ ok: false, error: gate.error }, { status: gate.status });
   }
   if (!canUseStaffLogin()) {
-    return NextResponse.json({ ok: false, error: 'Airtable is not configured' }, { status: 503 });
+    return NextResponse.json({ ok: false, error: 'Staff login needs a database (DATABASE_URL) or Airtable' }, { status: 503 });
   }
 
   const { recordId } = await ctx.params;
-  if (!recordId || !/^rec[A-Za-z0-9]{6,}$/.test(recordId)) {
+  if (!recordId || !/^(rec[A-Za-z0-9]{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.test(recordId)) {
     return NextResponse.json({ ok: false, error: 'Invalid record id' }, { status: 400 });
   }
 
@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ recordId:
   }
 
   const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-  const updated = await updateStaffPasswordHash(recordId, hash);
+  const updated = await getStore().updateStaffPasswordHash(recordId, hash);
   if (!updated.ok) {
     return NextResponse.json({ ok: false, error: updated.error || 'Failed to update password' }, { status: 502 });
   }

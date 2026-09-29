@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import type { FinanceTransactionRow } from '@/lib/airtable-finance';
+import type { FinanceTransactionRow } from '@/lib/data';
 
 type StaffRow = {
   recordId: string;
@@ -59,10 +59,12 @@ export function AdminDashboardClient({
   initialSummary,
   initialRows,
   sessionEmail,
+  financeCategories,
 }: {
   initialSummary: Summary;
   initialRows: FinanceTransactionRow[];
   sessionEmail: string;
+  financeCategories: string[];
 }) {
   const [summary, setSummary] = useState(initialSummary);
   const [rows, setRows] = useState(initialRows);
@@ -159,7 +161,7 @@ export function AdminDashboardClient({
     date: new Date().toISOString().slice(0, 10),
     type: 'income',
     amount: '',
-    category: 'ייעוץ',
+    category: financeCategories[0] ?? '',
     description: '',
     caseId: '',
   });
@@ -508,12 +510,9 @@ export function AdminDashboardClient({
               <label className="field">
                 <span>קטגוריה</span>
                 <select value={tx.category} onChange={(e) => setTx((t) => ({ ...t, category: e.target.value }))}>
-                  <option>ייעוץ</option>
-                  <option>שמאות</option>
-                  <option>ממשלה</option>
-                  <option>עמלה</option>
-                  <option>הוצאה משרדית</option>
-                  <option>אחר</option>
+                  {financeCategories.map((category) => (
+                    <option key={category}>{category}</option>
+                  ))}
                 </select>
               </label>
               <label className="field field-span-2">

@@ -55,6 +55,7 @@ export const mortgageAdvisorPreset: Preset = {
     mortgageColumns: true,
     invoicing: true,
   },
+  financeCategories: ['ייעוץ', 'שמאות', 'ממשלה', 'עמלה', 'הוצאה משרדית', 'אחר'],
   documentLibrary,
   mortgage: {
     caseTypes,

@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
-import { createStaffInAirtable, emailExistsInStaff } from '@/lib/airtable-staff';
+import { getStore } from '@/lib/data';
 import { env, canUseStaffLogin, hasStaffRegisterSecret, looksLikePlaceholder } from '@/lib/env';
 
 const SALT_ROUNDS = 12;
@@ -8,7 +8,7 @@ const MIN_PASSWORD = 10;
 
 export async function POST(req: NextRequest) {
   if (!canUseStaffLogin()) {
-    return NextResponse.json({ ok: false, error: 'Airtable is not configured' }, { status: 503 });
+    return NextResponse.json({ ok: false, error: 'Staff login needs a database (DATABASE_URL) or Airtable' }, { status: 503 });
   }
 
   const headerSecret = req.headers.get('x-keypoint-staff-register-secret')?.trim() || '';
@@ -37,12 +37,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: `Password must be at least ${MIN_PASSWORD} characters` }, { status: 400 });
   }
 
-  if (await emailExistsInStaff(email)) {
+  if ((await getStore().findStaffByEmail(email)).ok) {
     return NextResponse.json({ ok: false, error: 'Email already registered' }, { status: 409 });
   }
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  const created = await createStaffInAirtable({ email, passwordHash, fullName: fullName || undefined });
+  const created = await getStore().createStaff({ email, passwordHash, fullName: fullName || undefined });
   if (!created.ok || !created.data) {
     return NextResponse.json({ ok: false, error: created.error || 'Failed to create user' }, { status: 400 });
   }

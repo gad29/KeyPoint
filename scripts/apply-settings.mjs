@@ -48,6 +48,7 @@ const storage = settings.storage || {};
 const airtable = settings.airtable || {};
 const tables = airtable.tables || {};
 const business = settings.business || {};
+const database = settings.database || {};
 const billing = settings.billing || {};
 
 const appEnv = {
@@ -92,6 +93,9 @@ const appEnv = {
   GOOGLE_PRIVATE_KEY: connections.google?.privateKey || '',
   GOOGLE_DRIVE_FOLDER_ID: connections.google?.driveFolderId || '',
   GOOGLE_SHEETS_SPREADSHEET_ID: connections.google?.sheetsSpreadsheetId || '',
+  DATABASE_URL: database.url || '',
+  DATA_BACKEND: database.backend || '',
+  AGENCY_SLUG: database.agencySlug || 'default',
   AGENCY_OS_PRESET: (business.preset || 'default').trim().toLowerCase(),
   BUSINESS_NAME: business.name || '',
   BUSINESS_NAME_HE: business.nameHe || '',
@@ -152,6 +156,7 @@ fs.writeFileSync(
     '# Agency OS generated connection summary',
     '',
     `- Active preset: ${appEnv.AGENCY_OS_PRESET}`,
+    `- Data backend: ${appEnv.DATA_BACKEND || (appEnv.DATABASE_URL ? 'postgres (auto)' : appEnv.AIRTABLE_API_KEY ? 'airtable (auto)' : 'demo (auto)')}`,
     `- Business name set: ${Boolean(appEnv.BUSINESS_NAME || appEnv.BUSINESS_NAME_HE)}`,
     `- Currency: ${appEnv.BUSINESS_CURRENCY}`,
     `- Billing providers configured: ${[

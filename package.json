@@ -12,12 +12,16 @@
     "start:standalone": "node .next/standalone/server.js",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "apply-settings": "node scripts/apply-settings.mjs"
+    "apply-settings": "node scripts/apply-settings.mjs",
+    "db:up": "docker compose up -d db",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "db:bootstrap": "node scripts/db-bootstrap.mjs"
   },
   "dependencies": {
     "animejs": "^4.3.6",
     "bcryptjs": "^3.0.3",
     "next": "^15.5.12",
+    "postgres": "^3.4.9",
     "react": "19.0.0",
     "react-dom": "19.0.0"
   },

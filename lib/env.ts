@@ -1,4 +1,10 @@
 export const env = {
+  /** Postgres connection string (Supabase or any Postgres). When set, Postgres is the system of record. */
+  databaseUrl: process.env.DATABASE_URL,
+  /** Force a backend: 'postgres' | 'airtable' | 'demo'. Empty = auto-detect. */
+  dataBackend: (process.env.DATA_BACKEND || '').trim().toLowerCase(),
+  /** Which agency (tenant) this deployment serves. */
+  agencySlug: (process.env.AGENCY_SLUG || 'default').trim().toLowerCase(),
   airtableApiKey: process.env.AIRTABLE_API_KEY,
   airtableBaseId: process.env.AIRTABLE_BASE_ID,
   airtableCasesTable: process.env.AIRTABLE_CASES_TABLE || 'Cases',
@@ -103,9 +109,29 @@ export function hasStaffRegisterSecret() {
   return Boolean(env.staffRegisterSecret && !looksLikePlaceholder(env.staffRegisterSecret));
 }
 
-/** Staff email/password login requires Airtable (users stored in Staff table). */
+export function hasDatabaseConfig() {
+  return Boolean(env.databaseUrl && !looksLikePlaceholder(env.databaseUrl));
+}
+
+export type DataBackend = 'postgres' | 'airtable' | 'demo';
+
+export function getDataBackend(): DataBackend {
+  if (env.dataBackend === 'postgres' || env.dataBackend === 'airtable' || env.dataBackend === 'demo') {
+    return env.dataBackend;
+  }
+  if (hasDatabaseConfig()) return 'postgres';
+  if (hasAirtableConfig()) return 'airtable';
+  return 'demo';
+}
+
+/** True when cases are read from and written to a real store (Postgres or Airtable), not demo data. */
+export function hasLiveDataStore() {
+  return getDataBackend() !== 'demo';
+}
+
+/** Staff email/password login needs a real user store (Postgres users table or Airtable Staff table). */
 export function canUseStaffLogin() {
-  return hasAirtableConfig();
+  return hasLiveDataStore();
 }
 
 export function hasOfficeAlertsConfig() {

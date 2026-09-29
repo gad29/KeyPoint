@@ -13,3 +13,4 @@ n8n/.env.generated
 data/uploads/*
 !data/uploads/.gitkeep
 tsconfig.tsbuildinfo
+data/demo-db.json

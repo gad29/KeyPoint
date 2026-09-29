@@ -3,6 +3,9 @@ import { GenericIntakeForm } from '@/components/forms/generic-intake-form';
 import { IntakeHero } from '@/components/intake-hero';
 import { getActivePreset } from '@/lib/presets';
 
+// Reads preset/business/backend settings from the runtime environment.
+export const dynamic = 'force-dynamic';
+
 export default function IntakePage() {
   const preset = getActivePreset();
 

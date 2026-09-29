@@ -160,7 +160,7 @@ export function OfficeFrame({ children }: { children: ReactNode }) {
           <span className="sidebar-brand-mark">K</span>
           <div>
             <div className="sidebar-brand-name">Agency OS</div>
-            <div className="sidebar-brand-sub">ניהול תיקי משכנתאות</div>
+            <div className="sidebar-brand-sub">ניהול לקוחות ותיקים</div>
           </div>
         </div>
 
@@ -180,7 +180,7 @@ export function OfficeFrame({ children }: { children: ReactNode }) {
               <nav className="nav">
                 <Link href="/admin" className={pathname.startsWith('/admin') ? 'active' : undefined}>
                   <BarChartIcon />
-                  <span>יועץ — כספים</span>
+                  <span>כספים וניהול</span>
                 </Link>
               </nav>
             </>

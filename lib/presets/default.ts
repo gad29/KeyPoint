@@ -12,6 +12,7 @@ export const defaultPreset: Preset = {
     mortgageColumns: false,
     invoicing: true,
   },
+  financeCategories: ['שירות', 'מקדמה', 'מוצרים', 'עמלה', 'שיווק', 'ספקים', 'הוצאה משרדית', 'מיסים ואגרות', 'אחר'],
   wizardSteps: [
     {
       key: 'contact',

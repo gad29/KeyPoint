@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import type { BankOffer, CaseRecord } from '@/data/domain';
 import type { OfficeCaseBucket } from '@/lib/office-buckets';
+import { STAGE_LABELS_HE } from '@/lib/stage-labels';
 
 type OfficePageClientProps = {
   cases: CaseRecord[];
@@ -11,20 +12,7 @@ type OfficePageClientProps = {
   bucket: OfficeCaseBucket;
 };
 
-const STAGE_LABELS: Record<string, string> = {
-  'new-lead': 'ליד חדש',
-  'intake-submitted': 'טופס הוגש',
-  'approved': 'אושר',
-  'portal-activated': 'פורטל הופעל',
-  'documents-in-progress': 'מסמכים בתהליך',
-  'secretary-review': 'בדיקת מזכירה',
-  'waiting-appraiser': 'ממתין לשמאי',
-  'appraisal-received': 'שמאות התקבלה',
-  'ready-for-bank': 'מוכן לבנק',
-  'bank-negotiation': 'משא ומתן עם בנק',
-  'recommendation-prepared': 'המלצה מוכנה',
-  'completed': 'הושלם',
-};
+const STAGE_LABELS: Record<string, string> = STAGE_LABELS_HE;
 
 const BUCKET_META: Record<OfficeCaseBucket, { title: string; description: string; empty: string }> = {
   active: {

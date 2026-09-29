@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireAdvisorFinanceAccess } from '@/lib/admin-auth';
-import { createAirtableRecord } from '@/lib/airtable';
-import { env, hasAirtableConfig } from '@/lib/env';
+import { getStore } from '@/lib/data';
+import { getActivePreset } from '@/lib/presets';
 
 const VALID_TYPES = ['income', 'expense'] as const;
-const VALID_CATEGORIES = ['ייעוץ', 'שמאות', 'ממשלה', 'עמלה', 'אחר'] as const;
 
 export async function POST(req: Request) {
   const gate = await requireAdvisorFinanceAccess();
@@ -36,8 +35,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'type must be income or expense' }, { status: 400 });
   }
 
-  if (!VALID_CATEGORIES.includes(category as (typeof VALID_CATEGORIES)[number])) {
-    return NextResponse.json({ ok: false, error: `category must be one of: ${VALID_CATEGORIES.join(', ')}` }, { status: 400 });
+  const validCategories = getActivePreset().financeCategories;
+  if (!validCategories.includes(category)) {
+    return NextResponse.json({ ok: false, error: `category must be one of: ${validCategories.join(', ')}` }, { status: 400 });
   }
 
   const amountNum = Number(amount);
@@ -45,25 +45,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'amount must be a positive number' }, { status: 400 });
   }
 
-  if (!hasAirtableConfig()) {
-    return NextResponse.json({ ok: true, data: { id: 'local' } });
-  }
-
-  const table = env.airtableFinanceTransactionsTable;
-  const fields: Record<string, unknown> = {
-    Date: date,
-    Type: type === 'income' ? 'הכנסה' : 'הוצאה',
-    Amount: amountNum,
-    Category: category,
-    Description: description || '',
-    'Created at': new Date().toISOString(),
-  };
-  if (caseId) fields['Case ID'] = caseId;
-
-  const res = await createAirtableRecord(table, fields);
+  const res = await getStore().createFinanceTransaction({
+    date,
+    type: type as 'income' | 'expense',
+    amount: amountNum,
+    category,
+    description,
+    caseId,
+  });
   if (!res.ok || !res.data) {
     return NextResponse.json({ ok: false, error: res.error || 'Failed to create record' }, { status: 502 });
   }
 
-  return NextResponse.json({ ok: true, data: { id: (res.data as { id: string }).id } }, { status: 201 });
+  return NextResponse.json({ ok: true, data: { id: res.data.id } }, { status: 201 });
 }

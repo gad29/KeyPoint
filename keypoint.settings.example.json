@@ -20,6 +20,13 @@
     "currency": "ILS",
     "$currencyExamples": ["ILS", "USD", "EUR", "GBP"]
   },
+  "database": {
+    "$comment": "Optional. Postgres/Supabase connection string. When set, Postgres is the system of record. Run npm run db:migrate after setting it.",
+    "url": "",
+    "backend": "",
+    "$backendOptions": ["", "postgres", "airtable", "demo"],
+    "agencySlug": "default"
+  },
   "airtable": {
     "apiKey": "",
     "baseId": "",

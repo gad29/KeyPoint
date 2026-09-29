@@ -72,6 +72,8 @@ export interface Preset {
   documentLibrary?: DocumentRequirement[];
   /** Feature flags. */
   features: PresetFeatures;
+  /** Income/expense categories offered in the admin finance form (stored as-is). */
+  financeCategories: string[];
   /** Legacy mortgage enums: retained on the mortgage preset for the existing Airtable mappings. */
   mortgage?: {
     caseTypes: CaseType[];

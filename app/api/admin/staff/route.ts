@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdvisorFinanceAccess } from '@/lib/admin-auth';
-import { createStaffInAirtable, emailExistsInStaff, listStaffUsers } from '@/lib/airtable-staff';
+import { getStore } from '@/lib/data';
 import { canUseStaffLogin, looksLikePlaceholder } from '@/lib/env';
 import { normalizeStaffRole } from '@/lib/staff-roles';
 
@@ -13,7 +13,7 @@ export async function GET() {
   if (!canUseStaffLogin()) {
     return NextResponse.json({ ok: true, data: [] });
   }
-  const result = await listStaffUsers();
+  const result = await getStore().listStaff();
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 502 });
   }
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (!canUseStaffLogin()) {
-    return NextResponse.json({ ok: false, error: 'Airtable is not configured' }, { status: 503 });
+    return NextResponse.json({ ok: false, error: 'Staff login needs a database (DATABASE_URL) or Airtable' }, { status: 503 });
   }
 
   let body: { email?: string; password?: string; fullName?: string; role?: string };
@@ -64,12 +64,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (await emailExistsInStaff(email)) {
+  if ((await getStore().findStaffByEmail(email)).ok) {
     return NextResponse.json({ ok: false, error: 'אימייל זה כבר רשום במערכת' }, { status: 409 });
   }
 
   const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-  const created = await createStaffInAirtable({
+  const created = await getStore().createStaff({
     email,
     passwordHash,
     fullName: fullName || undefined,

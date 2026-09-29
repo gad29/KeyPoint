@@ -104,7 +104,7 @@ export function AdminFrame({ children }: { children: ReactNode }) {
           <span className="sidebar-brand-mark sidebar-brand-mark-admin">K</span>
           <div>
             <div className="sidebar-brand-name">Agency OS</div>
-            <div className="sidebar-brand-sub">דשבורד יועץ</div>
+            <div className="sidebar-brand-sub">דשבורד ניהול</div>
           </div>
         </div>
 

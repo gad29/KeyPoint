@@ -97,21 +97,6 @@ export async function listRecentFinanceTransactions(): Promise<ActionResult<Fina
   return { ok: true, data: rows };
 }
 
-export function summarizeTransactions(rows: FinanceTransactionRow[]) {
-  let income = 0;
-  let expense = 0;
-  for (const r of rows) {
-    if (r.type === 'income') income += r.amount;
-    else if (r.type === 'expense') expense += r.amount;
-  }
-  return {
-    incomeTotal: income,
-    expenseTotal: expense,
-    net: income - expense,
-    count: rows.length,
-  };
-}
-
 export async function logBillingEventToAirtable(fields: {
   kind: string;
   targetEmail?: string;
@@ -143,4 +128,27 @@ export async function logBillingEventToAirtable(fields: {
   const id = (res.data as { id?: string }).id;
   if (!id) return { ok: false, error: 'Airtable did not return id' };
   return { ok: true, data: { id } };
+}
+
+export async function createAirtableFinanceTransaction(input: {
+  date: string;
+  type: 'income' | 'expense';
+  amount: number;
+  category: string;
+  description?: string;
+  caseId?: string;
+}): Promise<ActionResult<{ id: string }>> {
+  const fields: Record<string, unknown> = {
+    Date: input.date,
+    Type: input.type === 'income' ? 'הכנסה' : 'הוצאה',
+    Amount: input.amount,
+    Category: input.category,
+    Description: input.description || '',
+    'Created at': new Date().toISOString(),
+  };
+  if (input.caseId) fields['Case ID'] = input.caseId;
+
+  const res = await createAirtableRecord(env.airtableFinanceTransactionsTable, fields);
+  if (!res.ok || !res.data) return { ok: false, error: res.error || 'Failed to create record' };
+  return { ok: true, data: { id: (res.data as { id: string }).id } };
 }

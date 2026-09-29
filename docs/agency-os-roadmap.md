@@ -113,7 +113,24 @@ Goal: same app runs, but mortgage vocabulary is gone; new generic types are in p
 
 **Ship criterion**: `npm run dev` works, `/intake` renders as a generic 3-step wizard, `/office` shows clients, TypeScript passes.
 
-### Phase 2 — Supabase migration + multi-tenant (1–2 sessions)
+### Phase 2 — Data layer + Postgres ✅ (done 2026-09-30)
+
+Shipped:
+- `DataStore` interface (`lib/data/`) with three backends: `postgres` (Supabase or any Postgres), `airtable` (unchanged behaviour for existing tenants), `demo` (zero-config local JSON).
+- Multi-tenant schema in `db/migrations/001_init.sql` (every row has `agency_id`; RLS enabled with no public policies), including Phase 3–4 tables (templates, invoices, payments, chase schedules/runs).
+- `npm run db:up | db:migrate | db:bootstrap`; local Docker Postgres in `docker-compose.yml`.
+- Repository, staff auth, admin finance and billing routes all go through the store.
+- Finance categories are now per preset.
+- Fixed: an unreachable n8n webhook made intake return 500 after the case was already saved.
+
+Decided: kept the custom bcrypt + signed-cookie staff auth (works on every backend); one agency per deployment via `AGENCY_SLUG` for now.
+
+Still open from the original Phase 2 plan:
+- Airtable → Postgres data import script.
+- Preset read from the agency row instead of `AGENCY_OS_PRESET`.
+- Multi-agency routing and self-serve sign-up (needs billing for the subscription itself).
+
+Original plan:
 - Add Supabase project (or self-hosted Postgres). Add Prisma with schema above.
 - Row-level security policies keyed on `agency_id` from JWT.
 - Migrate `lib/airtable.ts` callers to Prisma; keep `lib/airtable.ts` as an *optional export adapter* (agency-side "mirror to my Airtable" feature) — not the source of truth anymore.
@@ -155,7 +172,7 @@ Goal: same app runs, but mortgage vocabulary is gone; new generic types are in p
 | Question | Answer |
 |---|---|
 | Target market | Dual-market from day one: US (English, Stripe/QuickBooks) + Israel (Hebrew RTL, iCount/Green Invoice) |
-| Data layer | Migrate to Supabase (Postgres). Airtable becomes an optional export adapter, not source of truth. |
+| Data layer | Postgres/Supabase is the recommended system of record; Airtable stays a supported backend; demo mode for zero-config trials. |
 | Payment/accounting integrations in v1 | Scaffold **all** of Stripe, iCount, Green Invoice, QuickBooks, Xero. Wire Stripe end-to-end first; others get real credentials as agencies request them. |
 | Execution style | Phased, roadmap-committed, review between phases |
 
