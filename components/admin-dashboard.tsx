@@ -301,7 +301,7 @@ export function AdminDashboardClient({
       {/* Header */}
       <div className="hero product-hero hero-soft" style={{ marginBottom: 0 }}>
         <div>
-          <p className="eyebrow">KeyPoint · יועץ</p>
+          <p className="eyebrow">Agency OS · לוח ניהול</p>
           <h2 style={{ margin: '8px 0 6px' }}>כספים ותזרים</h2>
           <p className="muted" style={{ fontSize: 13 }}>{sessionEmail}</p>
         </div>

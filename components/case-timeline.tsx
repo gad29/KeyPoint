@@ -1,8 +1,9 @@
 'use client';
 
 import type { CaseStage } from '@/data/domain';
+import type { PresetId } from '@/lib/presets';
 
-const STAGES: { key: CaseStage; label: string }[] = [
+const MORTGAGE_STAGES: { key: CaseStage; label: string }[] = [
   { key: 'new-lead', label: 'ליד חדש' },
   { key: 'intake-submitted', label: 'טופס הוגש' },
   { key: 'approved', label: 'אושר' },
@@ -17,10 +18,23 @@ const STAGES: { key: CaseStage; label: string }[] = [
   { key: 'completed', label: 'הושלם' },
 ];
 
+const GENERIC_STAGES: { key: CaseStage; label: string }[] = [
+  { key: 'new-lead', label: 'ליד חדש' },
+  { key: 'invited', label: 'הוזמן' },
+  { key: 'onboarding', label: 'ממלא טופס' },
+  { key: 'intake-submitted', label: 'טופס הוגש' },
+  { key: 'documents-in-progress', label: 'מסמכים' },
+  { key: 'in-service', label: 'בעבודה' },
+  { key: 'invoice-sent', label: 'חשבונית נשלחה' },
+  { key: 'paid', label: 'שולם' },
+  { key: 'completed', label: 'הושלם' },
+];
+
 type Props = {
   currentStage: CaseStage;
   /** If provided, clicking a stage calls this. Omit for read-only mode. */
   onStageClick?: (stage: CaseStage) => void;
+  presetId?: PresetId;
 };
 
 function DoneIcon() {
@@ -31,13 +45,14 @@ function DoneIcon() {
   );
 }
 
-export function CaseTimeline({ currentStage, onStageClick }: Props) {
-  const currentIndex = STAGES.findIndex((s) => s.key === currentStage);
+export function CaseTimeline({ currentStage, onStageClick, presetId = 'default' }: Props) {
+  const stages = presetId === 'mortgage-advisor' ? MORTGAGE_STAGES : GENERIC_STAGES;
+  const currentIndex = stages.findIndex((s) => s.key === currentStage);
 
   return (
     <div className="stage-bar-wrap">
       <div className="stage-bar" dir="rtl">
-        {STAGES.map((stage, idx) => {
+        {stages.map((stage, idx) => {
           const isDone = idx < currentIndex;
           const isCurrent = idx === currentIndex;
           const stateClass = isDone ? 'done' : isCurrent ? 'current' : 'future';

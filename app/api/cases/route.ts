@@ -72,6 +72,71 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 
+  if (body.source === 'generic-intake') {
+    const answers = isObject(body.answers) ? (body.answers as Record<string, unknown>) : null;
+    if (!answers) {
+      return NextResponse.json({ ok: false, error: 'answers object is required' }, { status: 400 });
+    }
+
+    const fullName = typeof answers.fullName === 'string' ? answers.fullName.trim() : '';
+    const phone = typeof answers.phone === 'string' ? answers.phone.trim() : '';
+    const privacyAccepted = answers.privacyAccepted === true;
+    const accuracyConfirmed = answers.accuracyConfirmed === true;
+
+    if (!fullName || !phone || !privacyAccepted || !accuracyConfirmed) {
+      return NextResponse.json(
+        { ok: false, error: 'fullName, phone, and both consent checkboxes are required.' },
+        { status: 400 },
+      );
+    }
+
+    const submissionId = makeNativeIntakeSubmissionId();
+    const notesLines = ['Intake source: generic-intake', ''];
+    for (const [key, value] of Object.entries(answers)) {
+      notesLines.push(`- ${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`);
+    }
+
+    const result = await createCase({
+      leadName: fullName,
+      phone,
+      email: typeof answers.email === 'string' ? answers.email : undefined,
+      caseType: 'service-engagement',
+      borrowerProfiles: [],
+      notes: notesLines.join('\n'),
+      submissionId,
+      stage: 'intake-submitted',
+      source: 'generic-intake',
+    });
+
+    if (!result.ok || !result.data) {
+      const errorMessage = 'error' in result ? result.error : 'Failed to create case';
+      return NextResponse.json(
+        { ok: false, error: errorMessage, meta: { source: 'generic-intake', submissionId } },
+        { status: 400 },
+      );
+    }
+
+    const alertResult = await notifyNewIntake(result.data.id, result.data.leadName, result.data.phone);
+    if (!alertResult.ok) {
+      console.warn(
+        `[AgencyOS API] Generic intake created but office alert failed ${JSON.stringify({ caseId: result.data.id, error: alertResult.error })}`,
+      );
+    }
+
+    return NextResponse.json(
+      {
+        ok: true,
+        data: result.data,
+        meta: {
+          source: 'generic-intake',
+          submissionId,
+          automationTriggered: Boolean(env.officeAlertWebhookUrl || env.n8nWebhookBaseUrl),
+        },
+      },
+      { status: 201 },
+    );
+  }
+
   if (body.source === 'native-intake') {
     const intake = body.intake;
     if (!validateNativeIntake(intake)) {
@@ -103,7 +168,7 @@ export async function POST(req: NextRequest) {
     const alertResult = await notifyNewIntake(result.data.id, result.data.leadName, result.data.phone);
     if (!alertResult.ok) {
       console.warn(
-        `[KeyPoint API] Intake created but office alert failed ${JSON.stringify({ caseId: result.data.id, error: alertResult.error })}`,
+        `[AgencyOS API] Intake created but office alert failed ${JSON.stringify({ caseId: result.data.id, error: alertResult.error })}`,
       );
     }
 

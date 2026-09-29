@@ -18,8 +18,8 @@ const display = Frank_Ruhl_Libre({
 });
 
 export const metadata: Metadata = {
-  title: 'KeyPoint',
-  description: 'Mortgage file intake and progress for clients; office workspace for staff.',
+  title: process.env.BUSINESS_NAME || 'Agency OS',
+  description: 'Client onboarding, service updates, invoicing and payment follow-up for small businesses.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

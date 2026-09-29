@@ -159,7 +159,7 @@ export function OfficeFrame({ children }: { children: ReactNode }) {
         <div className="sidebar-brand">
           <span className="sidebar-brand-mark">K</span>
           <div>
-            <div className="sidebar-brand-name">KeyPoint</div>
+            <div className="sidebar-brand-name">Agency OS</div>
             <div className="sidebar-brand-sub">ניהול תיקי משכנתאות</div>
           </div>
         </div>

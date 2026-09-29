@@ -1,0 +1,17 @@
+{
+  "$comment": "Preset scope for each n8n workflow. 'default' workflows apply to every tenant. 'mortgage-advisor' workflows are only imported/activated when the mortgage-advisor preset is enabled.",
+  "workflows": [
+    { "file": "01-native-intake-post-create.json", "preset": "default", "purpose": "New client submitted the wizard — alert the agency to review" },
+    { "file": "02-office-approval-portal-invite.json", "preset": "default", "purpose": "Agency approved — generate a signed client portal link" },
+    { "file": "03-document-upload-review-queue.json", "preset": "default", "purpose": "Client uploaded a file — route to the review queue + OCR" },
+    { "file": "04-appraiser-dispatch.json", "preset": "mortgage-advisor", "purpose": "Dispatch a mortgage appraisal request" },
+    { "file": "05-bank-followup-reminders.json", "preset": "mortgage-advisor", "purpose": "Daily reminder for open bank runs" },
+    { "file": "06-ai-review-handoff.json", "preset": "default", "purpose": "Send anonymized stage snapshot to the AI review pipeline" },
+    { "file": "07-client-status-notifications.json", "preset": "default", "purpose": "Notify the client on status changes via WhatsApp/email fallback" },
+    { "file": "08-secretary-daily-briefing.json", "preset": "default", "purpose": "Daily briefing of what needs attention" },
+    { "file": "09-missing-docs-client-reminder.json", "preset": "default", "purpose": "One-click reminder for missing documents" },
+    { "file": "10-appraiser-followup.json", "preset": "mortgage-advisor", "purpose": "Follow-up when an appraiser is late" },
+    { "file": "11-receipt-pdf-generator.json", "preset": "mortgage-advisor", "purpose": "Generate a mortgage-advisor receipt PDF" },
+    { "file": "12-invoice-chase.json", "preset": "default", "purpose": "Escalating AI-drafted email cadence for overdue invoices (Phase 4)" }
+  ]
+}

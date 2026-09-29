@@ -155,7 +155,7 @@ export default function ConnectionsPage() {
       <section className="hero">
         <div>
           <p className="eyebrow">Connection status</p>
-          <h2>{likelyGoLiveReady ? 'KeyPoint is close to a live rollout.' : 'KeyPoint still needs a few connection gaps closed.'}</h2>
+          <h2>{likelyGoLiveReady ? 'Agency OS is close to a live rollout.' : 'Agency OS still needs a few connection gaps closed.'}</h2>
           <p className="muted">
             This screen summarizes whether the current environment looks production-ready without exposing raw secrets.
           </p>
@@ -176,7 +176,7 @@ export default function ConnectionsPage() {
         <section className="card stat-card">
           <p className="eyebrow">Production domain</p>
           <h3>{looksLikePlaceholder(env.appBaseUrl) ? 'Check URL' : hostLabel(env.appBaseUrl)}</h3>
-          <p className="muted">Expected public host is the main KeyPoint deployment target.</p>
+          <p className="muted">Expected public host is the main Agency OS deployment target.</p>
         </section>
         <section className="card stat-card">
           <p className="eyebrow">Upload durability</p>

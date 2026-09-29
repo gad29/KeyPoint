@@ -17,7 +17,7 @@ export function PublicFrame({ children }: { children: ReactNode }) {
     <div className="public-root" dir={dir}>
       <header className="public-topbar">
         <Link href="/" className="public-brand">
-          KeyPoint
+          Agency OS
         </Link>
         <div className="public-topbar-actions">
           <Link href="/" className="public-nav-link">

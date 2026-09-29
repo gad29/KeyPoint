@@ -47,6 +47,27 @@ export const env = {
   emailFromAddress: process.env.EMAIL_FROM_ADDRESS,
   emailReplyTo: process.env.EMAIL_REPLY_TO,
   emailApiKey: process.env.EMAIL_API_KEY,
+  /** Which preset shapes vocabulary and features. See lib/presets. */
+  preset: (process.env.AGENCY_OS_PRESET || 'default').trim().toLowerCase(),
+  /** Optional business branding used across UI + emails. */
+  businessName: process.env.BUSINESS_NAME || '',
+  businessNameHe: process.env.BUSINESS_NAME_HE || '',
+  businessTagline: process.env.BUSINESS_TAGLINE || '',
+  businessTaglineHe: process.env.BUSINESS_TAGLINE_HE || '',
+  /** Currency for invoices/chase. Defaults to ILS for the Israeli market; overridable per tenant. */
+  currency: (process.env.BUSINESS_CURRENCY || 'ILS').trim().toUpperCase(),
+  /** Payment integrations (all optional). */
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  icountCompanyId: process.env.ICOUNT_COMPANY_ID,
+  icountUser: process.env.ICOUNT_USER,
+  icountPassword: process.env.ICOUNT_PASSWORD,
+  greenInvoiceApiKey: process.env.GREEN_INVOICE_API_KEY,
+  greenInvoiceApiSecret: process.env.GREEN_INVOICE_API_SECRET,
+  quickbooksClientId: process.env.QUICKBOOKS_CLIENT_ID,
+  quickbooksClientSecret: process.env.QUICKBOOKS_CLIENT_SECRET,
+  xeroClientId: process.env.XERO_CLIENT_ID,
+  xeroClientSecret: process.env.XERO_CLIENT_SECRET,
 };
 
 export function hasAirtableConfig() {
@@ -126,4 +147,28 @@ export function hasAiReviewConfig() {
 
 export function isLocalUploadMode() {
   return !env.uploadPublicBaseUrl;
+}
+
+export function hasStripeConfig() {
+  return Boolean(env.stripeSecretKey && !looksLikePlaceholder(env.stripeSecretKey));
+}
+
+export function hasIcountConfig() {
+  return Boolean(env.icountCompanyId && env.icountUser && env.icountPassword);
+}
+
+export function hasGreenInvoiceConfig() {
+  return Boolean(env.greenInvoiceApiKey && env.greenInvoiceApiSecret);
+}
+
+export function hasQuickbooksConfig() {
+  return Boolean(env.quickbooksClientId && env.quickbooksClientSecret);
+}
+
+export function hasXeroConfig() {
+  return Boolean(env.xeroClientId && env.xeroClientSecret);
+}
+
+export function hasAnyBillingProvider() {
+  return hasStripeConfig() || hasIcountConfig() || hasGreenInvoiceConfig() || hasQuickbooksConfig() || hasXeroConfig();
 }

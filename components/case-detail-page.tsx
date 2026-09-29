@@ -6,6 +6,7 @@ import type { BankOffer, CaseRecord, CaseStage, DocumentRequirement } from '@/da
 import { CaseTimeline } from '@/components/case-timeline';
 import { CaseDocuments } from '@/components/case-documents';
 import { InviteGenerator } from '@/components/forms/invite-generator';
+import type { PresetFeatures, PresetId } from '@/lib/presets';
 
 const CASE_TYPE_LABELS: Record<string, string> = {
   'purchase-single-dwelling': 'רכישת דירה יחידה',
@@ -30,18 +31,30 @@ const PROFILE_LABELS: Record<string, string> = {
 
 const STAGE_LABELS: Record<string, string> = {
   'new-lead': 'ליד חדש',
+  'invited': 'הוזמן',
+  'onboarding': 'ממלא טופס',
   'intake-submitted': 'טופס הוגש',
+  'documents-in-progress': 'מסמכים בתהליך',
+  'in-service': 'בעבודה',
+  'invoice-sent': 'חשבונית נשלחה',
+  'paid': 'שולם',
+  'overdue': 'איחור בתשלום',
+  'completed': 'הושלם',
+  'archived': 'בארכיון',
   'approved': 'אושר',
   'portal-activated': 'פורטל הופעל',
-  'documents-in-progress': 'מסמכים בתהליך',
   'secretary-review': 'בדיקת מזכירה',
   'waiting-appraiser': 'ממתין לשמאי',
   'appraisal-received': 'שמאות התקבלה',
   'ready-for-bank': 'מוכן לבנק',
   'bank-negotiation': 'משא ומתן עם בנק',
   'recommendation-prepared': 'המלצה מוכנה',
-  'completed': 'הושלם',
 };
+
+const GENERIC_STAGE_KEYS = new Set<string>([
+  'new-lead', 'invited', 'onboarding', 'intake-submitted', 'documents-in-progress',
+  'in-service', 'invoice-sent', 'paid', 'overdue', 'completed', 'archived',
+]);
 
 const OFFER_STATUS_LABELS: Record<string, string> = {
   'not-started': 'לא החל',
@@ -50,22 +63,39 @@ const OFFER_STATUS_LABELS: Record<string, string> = {
   'expired': 'פג תוקף',
 };
 
-const TABS = [
-  { id: 'details', label: 'פרטים' },
-  { id: 'documents', label: 'מסמכים' },
-  { id: 'offers', label: 'הצעות בנק' },
-  { id: 'notes', label: 'הערות' },
-  { id: 'portal', label: 'פורטל לקוח' },
-];
+type TabId = 'details' | 'documents' | 'offers' | 'invoice' | 'notes' | 'portal';
+
+const TAB_LABELS: Record<TabId, string> = {
+  details: 'פרטים',
+  documents: 'מסמכים',
+  offers: 'הצעות בנק',
+  invoice: 'חיוב וגבייה',
+  notes: 'הערות',
+  portal: 'פורטל לקוח',
+};
 
 type Props = {
   caseRecord: CaseRecord;
   initialOffers: BankOffer[];
   checklist: (DocumentRequirement & { required: boolean })[];
+  presetId: PresetId;
+  presetFeatures: PresetFeatures;
 };
 
-export function CaseDetailPage({ caseRecord, initialOffers, checklist }: Props) {
-  const [activeTab, setActiveTab] = useState('details');
+export function CaseDetailPage({ caseRecord, initialOffers, checklist, presetId, presetFeatures }: Props) {
+  const tabs: Array<{ id: TabId; label: string }> = [
+    { id: 'details', label: TAB_LABELS.details },
+    { id: 'documents', label: TAB_LABELS.documents },
+    ...(presetFeatures.bankOffers ? [{ id: 'offers' as TabId, label: TAB_LABELS.offers }] : []),
+    ...(presetFeatures.invoicing ? [{ id: 'invoice' as TabId, label: TAB_LABELS.invoice }] : []),
+    { id: 'notes', label: TAB_LABELS.notes },
+    { id: 'portal', label: TAB_LABELS.portal },
+  ];
+  const stageOptions = presetId === 'mortgage-advisor'
+    ? Object.entries(STAGE_LABELS)
+    : Object.entries(STAGE_LABELS).filter(([key]) => GENERIC_STAGE_KEYS.has(key));
+  const [activeTab, setActiveTab] = useState<TabId>('details');
+  const [chaseStatus, setChaseStatus] = useState('');
   const [caseData, setCaseData] = useState(caseRecord);
   const [offers, setOffers] = useState(initialOffers);
   const [saving, setSaving] = useState(false);
@@ -176,14 +206,18 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist }: Props) 
               {caseData.spouseName && <span style={{ fontWeight: 500, color: 'var(--muted)', fontSize: '0.75em' }}> & {caseData.spouseName}</span>}
             </h2>
             <p className="muted" style={{ fontSize: 14 }}>
-              {CASE_TYPE_LABELS[caseData.caseType] ?? caseData.caseType}
+              {presetFeatures.mortgageColumns
+                ? (CASE_TYPE_LABELS[caseData.caseType] ?? caseData.caseType)
+                : 'לקוח'}
               {caseData.assignedTo && ` · אחראי: ${caseData.assignedTo}`}
             </p>
-            <div className="profile-tags">
-              {caseData.borrowerProfiles.map((p) => (
-                <span key={p} className="profile-tag">{PROFILE_LABELS[p] ?? p}</span>
-              ))}
-            </div>
+            {presetFeatures.mortgageColumns && caseData.borrowerProfiles.length > 0 && (
+              <div className="profile-tags">
+                {caseData.borrowerProfiles.map((p) => (
+                  <span key={p} className="profile-tag">{PROFILE_LABELS[p] ?? p}</span>
+                ))}
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {caseData.phone && (
@@ -196,13 +230,13 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist }: Props) 
 
         {/* Stage timeline */}
         <div style={{ marginTop: 20 }}>
-          <CaseTimeline currentStage={caseData.stage} onStageClick={handleStageClick} />
+          <CaseTimeline currentStage={caseData.stage} onStageClick={handleStageClick} presetId={presetId} />
         </div>
       </div>
 
       {/* Tab bar */}
       <div className="tab-bar" role="tablist">
-        {TABS.map((tab) => (
+        {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -224,7 +258,7 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist }: Props) 
             <label className="field">
               <span>שלב נוכחי</span>
               <select name="stage" defaultValue={caseData.stage}>
-                {Object.entries(STAGE_LABELS).map(([key, label]) => (
+                {stageOptions.map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
                 ))}
               </select>
@@ -260,8 +294,8 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist }: Props) 
         <CaseDocuments caseId={caseData.id} checklist={checklist} />
       )}
 
-      {/* Tab: הצעות בנק */}
-      {activeTab === 'offers' && (
+      {/* Tab: הצעות בנק (mortgage-advisor preset only) */}
+      {activeTab === 'offers' && presetFeatures.bankOffers && (
         <div className="grid">
           <section className="card">
             <p className="eyebrow" style={{ marginBottom: 12 }}>הצעות שהתקבלו</p>
@@ -337,6 +371,51 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist }: Props) 
             </button>
           </form>
         </div>
+      )}
+
+      {/* Tab: חיוב וגבייה (default preset + any preset with invoicing) */}
+      {activeTab === 'invoice' && presetFeatures.invoicing && (
+        <section className="card" style={{ display: 'grid', gap: 16 }}>
+          <p className="eyebrow">חיוב וגבייה</p>
+          <p className="muted">
+            שליחת חשבונית ומעקב תשלומים משיקים בשלב 4. השלב הנוכחי מציג את פעולות הקליק-אחד ומפעיל את הזרמת n8n כשקיימת.
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              className="button"
+              onClick={async () => {
+                setChaseStatus('שולח לחשבונית…');
+                const res = await fetch('/api/invoices', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ caseId: caseData.id }),
+                });
+                const json = await res.json() as { ok: boolean; error?: string };
+                setChaseStatus(json.ok ? 'נשלח ✓' : json.error || 'נכשל');
+              }}
+            >
+              שליחת חשבונית
+            </button>
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={async () => {
+                setChaseStatus('מפעיל תזכורת תשלום…');
+                const res = await fetch('/api/chase', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ invoiceId: caseData.id }),
+                });
+                const json = await res.json() as { ok: boolean; error?: string };
+                setChaseStatus(json.ok ? 'תזכורת נשלחה ✓' : json.error || 'נכשל');
+              }}
+            >
+              תזכורת תשלום
+            </button>
+          </div>
+          {chaseStatus ? <p className="muted small">{chaseStatus}</p> : null}
+        </section>
       )}
 
       {/* Tab: הערות */}

@@ -1,96 +1,130 @@
-# KeyPoint
+# Agency OS
 
-KeyPoint is an Israel-focused mortgage advisor MVP built with Next.js, Airtable, and n8n, with a native in-app intake flow as the only active intake path.
+Client onboarding + invoice chase for small service businesses. Preset-driven: works out of the box for any small business, adapts to verticals like mortgage advisors via a preset.
 
-## What is ready now
-- Next.js app scaffold for overview, public intake, office dashboard, portal, docs, login, and signed invite links
-- Polished native multi-step intake under `/intake`
-- Airtable-backed case loading through the repository layer
-- Live case creation endpoint and case-stage update endpoint
-- n8n webhook bridge for workflow forwarding and upload events
-- Importable workflow pack under `n8n/workflows/`
-- Single settings-file generator for app env + n8n env output
-- Integration docs for Airtable, deployment, and workflow rollout
+Originally built as **KeyPoint** for Israeli mortgage advisors; the mortgage flow is preserved as the `mortgage-advisor` preset.
 
-## Single settings file flow
+## The 5-step client lifecycle
+
+Agency OS replaces email ping-pong and manual chasing with five one-click actions:
+
+| # | Step | What happens |
+|---|---|---|
+| 1 | **Send onboarding link** | Client walks a branded wizard: details, uploads, e-sign |
+| 2 | **Remind for missing docs** | One button sends a polite reminder in the client's language |
+| 3 | **Updates during the service** | Optional personal tracking link + one-click status updates |
+| 4 | **Issue the invoice** | Via Stripe / iCount / Green Invoice / QuickBooks / Xero |
+| 5 | **Auto-chase late payments** | Escalating AI-drafted emails with a one-click pay link |
+
+## Presets
+
+A preset shapes the vocabulary, wizard steps, dashboard columns, and which n8n workflows apply.
+
+| Preset | For | Extras |
+|---|---|---|
+| `default` | Any small service business | Generic 3-step wizard (contact, service, consent), invoicing |
+| `mortgage-advisor` | Israeli mortgage advisors (legacy KeyPoint flow) | 5-step mortgage wizard, borrower profiles, case types, bank-offer panel, appraiser workflows |
+
+Select the active preset with `AGENCY_OS_PRESET=default|mortgage-advisor` (default: `default`).
+
+Adding your own preset: drop a `lib/presets/<your-slug>.ts` that exports a `Preset` and register it in `lib/presets/index.ts`. See [`docs/presets.md`](docs/presets.md).
+
+## Roadmap
+
+Full plan: [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md).
+
+- **Phase 0** ✅ Roadmap committed
+- **Phase 1** ✅ Preset system, generic wizard, invoice/chase scaffolding, mortgage flow preserved as preset
+- **Phase 2** Supabase (Postgres) multi-tenant migration
+- **Phase 3** Onboarding as a real product (templates, e-sign, branded portal)
+- **Phase 4** Billing + chase engine (Stripe first, then iCount / Green Invoice / QuickBooks / Xero)
+- **Phase 5** Polish (unified timeline, teams, WhatsApp/Slack)
+
+## What works today
+
+- Preset-driven public wizard at `/intake` — generic 3-step for `default`, full 5-step mortgage wizard for `mortgage-advisor`
+- Signed client invite tokens + `/portal/[token]` progress link
+- Office dashboard (`/office/active`, `/stuck`, `/completed`) + case detail with document tracking
+- Airtable-backed data (Phase 2 will replace with Supabase; Airtable stays as an optional export)
+- `POST /api/uploads` with n8n forwarding
+- Staff auth (bcrypt sessions)
+- Invoice + chase API stubs (`/api/invoices`, `/api/chase`) — Phase 4 wires the adapters end-to-end
+- Adapter scaffolds for Stripe, iCount, Green Invoice, QuickBooks, Xero
+- Hebrew + English, RTL support
+
+## Settings file flow
+
+Everything below is **optional**. Only fill in what you actually use.
+
 1. Copy the example:
    ```bash
    cp keypoint.settings.example.json keypoint.settings.json
    ```
-2. Fill in your real credentials, phone numbers, email address, webhook URLs, and provider values.
+2. Fill in the values you have (Airtable, n8n, WhatsApp, email, payment providers). Leave the rest blank.
 3. Generate env files:
    ```bash
    npm run apply-settings
    ```
 4. Generated outputs:
-   - `.env.local`
-   - `.env.production.local`
+   - `.env.local`, `.env.production.local`
    - `n8n/.env.generated`
    - `generated/vercel.env`
    - `generated/connections-summary.md`
 
+Legacy filename `keypoint.settings.json` is kept for compatibility; Phase 2 will rename to `agency-os.settings.json`.
+
 ## Run locally
+
 ```bash
 npm install
 npm run apply-settings   # after keypoint.settings.json exists
 npm run dev
 ```
 
+Try the alternate preset:
+
+```bash
+AGENCY_OS_PRESET=mortgage-advisor npm run dev
+```
+
+## Core routes
+
+- `/` — landing (preset-aware copy)
+- `/intake` — public onboarding wizard (shape depends on active preset)
+- `/progress/:token` — read-only client progress page
+- `/office/active` · `/office/stuck` · `/office/completed` — pipeline buckets
+- `/office/case/:caseId` — case detail (mortgage panels hidden unless mortgage preset)
+- `/login` · `/admin`
+
+## Core API routes
+
+- `GET /api/cases` · `POST /api/cases` — list / create cases. Public path for `source: 'generic-intake'` and `source: 'native-intake'`; staff session required otherwise
+- `GET /api/cases/:caseId` · `PATCH /api/cases/:caseId` — read / update a case
+- `POST /api/cases/:caseId/offers` — mortgage-advisor preset only
+- `POST /api/invites` — signed client portal link
+- `POST /api/uploads` — file upload + n8n forward
+- `GET /api/invoices` · `POST /api/invoices` — invoice CRUD *(scaffold; Phase 4)*
+- `GET /api/chase` · `POST /api/chase` — invoice chase engine *(scaffold; forwards to n8n if configured)*
+- `POST /api/webhooks/n8n` — generic n8n forwarder
+
 ## Deploy
+
 ### Vercel
-- Put the values from `generated/vercel.env` into Vercel project env vars, or paste them directly from that file.
-- Put the values from `n8n/.env.generated` into your n8n environment.
-- Import the workflows from `n8n/workflows/`.
+- Copy values from `generated/vercel.env` into Vercel env vars.
+- Copy `n8n/.env.generated` into your n8n environment.
+- Import workflows from `n8n/workflows/` — see [`n8n/README.md`](n8n/README.md) for which apply per preset.
 - Set `OFFICE_ACCESS_CODE` in production before exposing `/office` publicly.
-- The app is now schema-aware against the live Airtable base, but keeping the field labels aligned with `docs/airtable-schema.md` is still the cleanest path.
 
 ### Self-hosted VPS / CloudPanel
 - Copy `.env.production.example` to `.env.production.local`, or generate it via `npm run apply-settings`.
-- Build with `npm run build`.
-- Start with `pm2 start ecosystem.config.cjs`.
-- Full guide: `docs/cloudpanel-vps-deploy.md`.
+- Build with `npm run build`, start with `pm2 start ecosystem.config.cjs`.
+- Full guide: [`docs/cloudpanel-vps-deploy.md`](docs/cloudpanel-vps-deploy.md).
 
-## Core routes
-- `/` — public welcome page
-- `/intake` — public native intake flow with post-submit document upload
-- `/progress/:token` — read-only client progress page
-- `/office` → redirects to `/office/active`
-- `/office/active` — open cases, no missing checklist count
-- `/office/stuck` — open cases with `missingItems > 0`
-- `/office/completed` — stage `completed`
-- `/login` — progress-token entry + office entry
+## Key docs
 
-## Core API routes
-- `GET /api/cases` — list cases (**office session** or disabled office mode)
-- `POST /api/cases` — native intake (`source: native-intake`) is public; other creates require **office session**
-- `GET /api/cases/:caseId` — fetch a case (**office session** or disabled office mode)
-- `PATCH /api/cases/:caseId` — update case stage (**office session** or disabled office mode)
-- `POST /api/invites` — generate a signed invite link (**office session** or disabled office mode)
-- `POST /api/uploads` — save an upload and forward the event to n8n (requires a real `caseId`; size limit `UPLOAD_MAX_FILE_BYTES`, default 15 MiB)
-- `POST /api/webhooks/n8n` — generic n8n forwarder (**office session**, or `x-keypoint-forwarder-secret` when `N8N_FORWARDER_SECRET` is set; in production with a live app URL, anonymous calls are rejected unless one of these applies)
-
-## Current operational model
-- Cases load from Airtable when configured, otherwise sample data is used.
-- Native intake submits to `POST /api/cases` with `source: 'native-intake'` and generates an internal submission ID for traceability.
-- Native intake now creates a case row, primary client record, optional co-applicant client record, seeded case-document checklist rows, and an intake activity log in Airtable.
-- Full intake answers are still serialized into case notes for the MVP so office staff keeps the richer context even when a dedicated Airtable field does not exist yet.
-- Portal invites are signed and stateless; they no longer rely on local invite files.
-- Client progress links now resolve under `/progress/:token` and are read-only.
-- Uploads still default to local disk unless you route them onward through your automation/storage path.
-- Upload events are forwarded to `keypoint/document-upload` on the configured n8n base URL.
-- Office case updates persist back to Airtable, and advisor/bank offers can be written into the `Bank runs` table.
-- Stage changes send anonymized payloads to n8n (`keypoint/stage-review`). New bank offers also trigger `keypoint/offer-comparison`. See `docs/n8n-webhook-paths.md`.
-- Native intake no longer depends on Fillout or the old intake webhook. Case creation happens directly in the app, and the n8n rebuild is being reset around Airtable-triggered post-create automation plus document-processing workflows.
-- When Airtable is configured, invite generation and uploads also create Airtable activity/document records.
-
-## Remaining real-world caveats
-- Upload persistence is still local by default unless you connect a storage provider path.
-- n8n provider credentials themselves may still require manual entry in n8n depending on the service.
-- Office access can now be protected with an internal `OFFICE_ACCESS_CODE`; portal access remains invite-based.
-
-## Important docs
-- `docs/integration-checklist.md`
-- `docs/deployment-notes.md`
-- `docs/automation-implementation.md`
-- `docs/n8n-workflows.md`
-- `n8n/README.md`
+- [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md) — the pivot plan
+- [`docs/presets.md`](docs/presets.md) — how to configure or add a preset
+- [`docs/integration-checklist.md`](docs/integration-checklist.md)
+- [`docs/automation-implementation.md`](docs/automation-implementation.md)
+- [`docs/n8n-workflows.md`](docs/n8n-workflows.md)
+- [`docs/advisor-dashboard.md`](docs/advisor-dashboard.md) — reference for the mortgage-advisor preset

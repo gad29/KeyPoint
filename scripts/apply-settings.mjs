@@ -47,6 +47,8 @@ const connections = settings.connections || {};
 const storage = settings.storage || {};
 const airtable = settings.airtable || {};
 const tables = airtable.tables || {};
+const business = settings.business || {};
+const billing = settings.billing || {};
 
 const appEnv = {
   APP_BASE_URL: appBaseUrl,
@@ -90,6 +92,23 @@ const appEnv = {
   GOOGLE_PRIVATE_KEY: connections.google?.privateKey || '',
   GOOGLE_DRIVE_FOLDER_ID: connections.google?.driveFolderId || '',
   GOOGLE_SHEETS_SPREADSHEET_ID: connections.google?.sheetsSpreadsheetId || '',
+  AGENCY_OS_PRESET: (business.preset || 'default').trim().toLowerCase(),
+  BUSINESS_NAME: business.name || '',
+  BUSINESS_NAME_HE: business.nameHe || '',
+  BUSINESS_TAGLINE: business.tagline || '',
+  BUSINESS_TAGLINE_HE: business.taglineHe || '',
+  BUSINESS_CURRENCY: (business.currency || 'ILS').trim().toUpperCase(),
+  STRIPE_SECRET_KEY: billing.stripe?.secretKey || '',
+  STRIPE_WEBHOOK_SECRET: billing.stripe?.webhookSecret || '',
+  ICOUNT_COMPANY_ID: billing.icount?.companyId || '',
+  ICOUNT_USER: billing.icount?.user || '',
+  ICOUNT_PASSWORD: billing.icount?.password || '',
+  GREEN_INVOICE_API_KEY: billing.greenInvoice?.apiKey || '',
+  GREEN_INVOICE_API_SECRET: billing.greenInvoice?.apiSecret || '',
+  QUICKBOOKS_CLIENT_ID: billing.quickbooks?.clientId || '',
+  QUICKBOOKS_CLIENT_SECRET: billing.quickbooks?.clientSecret || '',
+  XERO_CLIENT_ID: billing.xero?.clientId || '',
+  XERO_CLIENT_SECRET: billing.xero?.clientSecret || '',
 };
 
 const n8nEnv = {
@@ -130,7 +149,20 @@ fs.writeFileSync(path.join(generatedDir, 'vercel.env'), envBlock(appEnv));
 fs.writeFileSync(
   path.join(generatedDir, 'connections-summary.md'),
   [
-    '# KeyPoint generated connection summary',
+    '# Agency OS generated connection summary',
+    '',
+    `- Active preset: ${appEnv.AGENCY_OS_PRESET}`,
+    `- Business name set: ${Boolean(appEnv.BUSINESS_NAME || appEnv.BUSINESS_NAME_HE)}`,
+    `- Currency: ${appEnv.BUSINESS_CURRENCY}`,
+    `- Billing providers configured: ${[
+      appEnv.STRIPE_SECRET_KEY && 'stripe',
+      appEnv.ICOUNT_COMPANY_ID && 'icount',
+      appEnv.GREEN_INVOICE_API_KEY && 'green-invoice',
+      appEnv.QUICKBOOKS_CLIENT_ID && 'quickbooks',
+      appEnv.XERO_CLIENT_ID && 'xero',
+    ].filter(Boolean).join(', ') || '(none — Phase 4 features stay off)'}`,
+    '',
+    '## Legacy summary',
     '',
     `- App base URL: ${appBaseUrl}`,
     `- App base URL looks live: ${!looksLikePlaceholder(appBaseUrl) && !appBaseUrl.includes('localhost')}`,
@@ -159,4 +191,4 @@ fs.writeFileSync(
   ].join('\n'),
 );
 
-console.log('KeyPoint settings applied. Generated app + n8n env files.');
+console.log('Agency OS settings applied. Generated app + n8n env files.');

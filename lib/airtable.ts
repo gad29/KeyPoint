@@ -168,17 +168,24 @@ function normalizeStage(value: unknown): CaseStage {
   const raw = asString(value, 'new-lead').trim().toLowerCase().replace(/\s+/g, '-') as CaseStage;
   const allowed: CaseStage[] = [
     'new-lead',
+    'invited',
+    'onboarding',
     'intake-submitted',
+    'documents-in-progress',
+    'in-service',
+    'invoice-sent',
+    'paid',
+    'overdue',
+    'completed',
+    'archived',
     'approved',
     'portal-activated',
-    'documents-in-progress',
     'secretary-review',
     'waiting-appraiser',
     'appraisal-received',
     'ready-for-bank',
     'bank-negotiation',
     'recommendation-prepared',
-    'completed',
   ];
   return allowed.includes(raw) ? raw : 'new-lead';
 }

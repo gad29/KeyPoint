@@ -1,16 +1,44 @@
+/**
+ * Full lifecycle vocabulary. Union of the generic small-business lifecycle
+ * (default preset) and the mortgage-advisor lifecycle. A tenant only ever sees
+ * the stages relevant to its active preset.
+ *
+ * Generic (default preset) stages map to the 5 canonical actions:
+ *   1. Send onboarding link   → 'invited'
+ *   2. Client is filling in    → 'onboarding'
+ *   3. Submitted, agency reviews → 'intake-submitted'
+ *   4. Docs missing, remind    → 'documents-in-progress'
+ *   5. Work in progress        → 'in-service'
+ *   6. Invoice issued          → 'invoice-sent'
+ *   7. Payment received        → 'paid'
+ *   8. Payment overdue, chase  → 'overdue'
+ *   9. Done                    → 'completed' / 'archived'
+ */
 export type CaseStage =
+  // shared with any preset
   | 'new-lead'
+  | 'invited'
+  | 'onboarding'
   | 'intake-submitted'
+  | 'documents-in-progress'
+  | 'in-service'
+  | 'invoice-sent'
+  | 'paid'
+  | 'overdue'
+  | 'completed'
+  | 'archived'
+  // mortgage-advisor preset only
   | 'approved'
   | 'portal-activated'
-  | 'documents-in-progress'
   | 'secretary-review'
   | 'waiting-appraiser'
   | 'appraisal-received'
   | 'ready-for-bank'
   | 'bank-negotiation'
-  | 'recommendation-prepared'
-  | 'completed';
+  | 'recommendation-prepared';
+
+/** Aliased for callers using the newer name. */
+export type LifecycleStage = CaseStage;
 
 export type BorrowerProfile =
   | 'salaried'
@@ -239,6 +267,67 @@ export const sampleCases: CaseRecord[] = [
     bankTargets: ['Leumi', 'Benleumi'],
     nextAction: 'Compare approval-in-principle baskets before expiry.',
   },
+];
+
+export type InvoiceStatus =
+  | 'draft'
+  | 'sent'
+  | 'viewed'
+  | 'partial'
+  | 'paid'
+  | 'overdue'
+  | 'written-off';
+
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number;
+  unitAmount: number;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  caseId: string;
+  number: string;
+  currency: string;
+  lineItems: InvoiceLineItem[];
+  subtotal: number;
+  vatAmount: number;
+  total: number;
+  issuedAt: string;
+  dueAt?: string;
+  paidAt?: string;
+  status: InvoiceStatus;
+  /** Which provider created this invoice ('stripe' | 'icount' | 'green-invoice' | 'internal' | ...). */
+  sourceAdapter: string;
+  externalId?: string;
+  payLinkUrl?: string;
+}
+
+export type ChaseTone = 'friendly' | 'reminder' | 'firm' | 'final';
+
+export interface ChaseStep {
+  dayOffset: number;
+  tone: ChaseTone;
+  /** Prompt appended to the AI email brief for this step. */
+  aiPromptEn?: string;
+  aiPromptHe?: string;
+}
+
+export interface ChaseRun {
+  id: string;
+  invoiceId: string;
+  stepIndex: number;
+  tone: ChaseTone;
+  sentAt: string;
+  channel: 'email' | 'whatsapp' | 'sms';
+  status: 'sent' | 'opened' | 'replied' | 'paid' | 'paused';
+}
+
+export const defaultChaseCadence: ChaseStep[] = [
+  { dayOffset: 3, tone: 'friendly' },
+  { dayOffset: 10, tone: 'reminder' },
+  { dayOffset: 21, tone: 'firm' },
+  { dayOffset: 30, tone: 'final' },
 ];
 
 export const sampleOffers: BankOffer[] = [

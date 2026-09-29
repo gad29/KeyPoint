@@ -1,6 +1,6 @@
 {
   "app": {
-    "baseUrl": "https://keypoint.work",
+    "baseUrl": "https://agency-os.example",
     "portalInviteSecret": "replace-with-a-long-random-secret",
     "officeAccessCode": "",
     "officeSessionSecret": "",
@@ -8,6 +8,17 @@
     "staffSessionSecret": "",
     "staffRegisterSecret": "",
     "n8nForwarderSecret": ""
+  },
+  "business": {
+    "$comment": "All optional. Shown on the landing page and in emails when set.",
+    "preset": "default",
+    "$presetOptions": ["default", "mortgage-advisor"],
+    "name": "",
+    "nameHe": "",
+    "tagline": "",
+    "taglineHe": "",
+    "currency": "ILS",
+    "$currencyExamples": ["ILS", "USD", "EUR", "GBP"]
   },
   "airtable": {
     "apiKey": "",
@@ -35,6 +46,30 @@
   },
   "n8n": {
     "webhookBaseUrl": "https://n8n.example.com/webhook"
+  },
+  "billing": {
+    "$comment": "Optional. Fill only the provider(s) you actually use. Phase 4 wires these end-to-end.",
+    "stripe": {
+      "secretKey": "",
+      "webhookSecret": ""
+    },
+    "icount": {
+      "companyId": "",
+      "user": "",
+      "password": ""
+    },
+    "greenInvoice": {
+      "apiKey": "",
+      "apiSecret": ""
+    },
+    "quickbooks": {
+      "clientId": "",
+      "clientSecret": ""
+    },
+    "xero": {
+      "clientId": "",
+      "clientSecret": ""
+    }
   },
   "connections": {
     "officeAlerts": {
