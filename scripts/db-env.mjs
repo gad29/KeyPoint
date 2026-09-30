@@ -1,14 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-/** Loads .env.local into process.env (without overriding existing values) for standalone scripts. */
+/** Loads .env.local, then .env.production.local (servers), into process.env without overriding existing values. */
 export function loadLocalEnv() {
-  const file = path.join(process.cwd(), '.env.local');
-  if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
-    const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
-    if (!match || process.env[match[1]] !== undefined) continue;
-    process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+  for (const name of ['.env.local', '.env.production.local']) {
+    const file = path.join(process.cwd(), name);
+    if (!fs.existsSync(file)) continue;
+    for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+      const match = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+      if (!match || process.env[match[1]] !== undefined) continue;
+      process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    }
   }
 }
 
