@@ -167,7 +167,26 @@ Original plan:
 
 **Ship criterion**: create a template, share a link, walk it end-to-end, contract PDF lands in the client record.
 
-### Phase 4 — Billing + invoice chase (2 sessions)
+### Phase 4 — Billing + payment reminders ✅ (done 2026-09-30)
+
+Shipped (details in `docs/billing.md`):
+- Payment requests (line items, VAT, due date, service summary) per case or standalone; labelled "payment request", not a tax invoice.
+- Client payment page `/pay/<token>`: Stripe Checkout for the remaining balance, your own payment link, bank details; print view.
+- Stripe: checkout session, signed webhook (idempotent under concurrency), confirmation on return; tested against a local Stripe mock.
+- Reminder engine: configurable cadence (3/10/21/30 days), approval queue at `/office/billing` or opt-in auto-send by email, stops on payment, pause per request; daily run via Vercel Cron or n8n workflow 12.
+- Optional Claude drafting (`claude-opus-5-5`, structured output, refusal fallback) with template fallback.
+- Email via Resend or webhook; WhatsApp deep links everywhere as the zero-setup channel.
+- Case stage sync: invoice-sent → overdue → paid.
+- Green Invoice + iCount tax-invoice adapters (beta, unverified); QuickBooks / Xero placeholders.
+- Fixed while testing: VAT rounding off by one agora on half-agora amounts.
+
+Not done / later:
+- Verify Green Invoice / iCount against live or sandbox accounts.
+- Inbound email to auto-pause reminders when a client replies.
+- QuickBooks / Xero OAuth sync; recurring (retainer) invoices.
+- Reminder language from the client's saved preference (currently Hebrew for ILS businesses).
+
+Original plan:
 - Invoices UI: create, send, mark paid; internal invoices for agencies that don't have accounting software.
 - **Stripe adapter first** (Checkout link = one-click pay); on `checkout.session.completed` webhook, mark `Invoice.status = paid`.
 - iCount + Green Invoice adapters: scaffolded with API-key config in admin; each implements `createInvoice`, `getInvoice`, `listOverdue`, `markPaidExternally`.

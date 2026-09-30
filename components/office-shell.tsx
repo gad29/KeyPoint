@@ -117,6 +117,7 @@ const primaryNav = [
   { href: '/office/active', label: 'תיקים פעילים', Icon: FolderIcon },
   { href: '/office/stuck', label: 'תקועים', Icon: AlertIcon },
   { href: '/office/completed', label: 'הושלמו', Icon: CheckCircleIcon },
+  { href: '/office/billing', label: 'גבייה', Icon: BarChartIcon },
 ];
 
 const secondaryNav = [

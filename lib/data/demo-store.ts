@@ -4,6 +4,7 @@ import { sampleCases, sampleOffers, type BankOffer, type CaseRecord } from '@/da
 import { appendUploadToFile, dataRoot, readJson, readUploadsFromFile, writeJson } from '@/lib/data/json-file';
 import type { CaseContactInput, CaseDocumentRecord, DataStore } from '@/lib/data/types';
 import type { AgencyBranding, ContractSignature, OnboardingTemplate } from '@/lib/onboarding/types';
+import { demoBilling } from '@/lib/data/demo-billing';
 
 type DemoDb = {
   caseSeq: number;
@@ -40,6 +41,7 @@ const unsupported = { ok: false as const, error: 'Not available in demo mode. Co
 /** Local JSON demo backend: lets the app run end-to-end with zero configuration. Not for production. */
 export const demoStore: DataStore = {
   kind: 'demo',
+  ...demoBilling,
 
   async listCases() {
     return { ok: true, data: load().cases };

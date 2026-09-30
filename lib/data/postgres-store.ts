@@ -1,44 +1,11 @@
 import type { BankOffer, BorrowerProfile, CaseRecord, CaseStage, CaseType } from '@/data/domain';
-import { env } from '@/lib/env';
 import { normalizeStaffRole } from '@/lib/staff-roles';
 import { getSql } from '@/lib/data/postgres-client';
+import { caseUuid, fail, getAgencyId, iso, jsonb, UUID_RE, type Row } from '@/lib/data/postgres-shared';
+import { postgresBilling } from '@/lib/data/postgres-billing';
 import type { CaseDocumentRecord, DataStore, FinanceTransactionRow } from '@/lib/data/types';
 import type { ContractSignature, OnboardingTemplate } from '@/lib/onboarding/types';
 import type { ActionResult, UploadRecord } from '@/lib/types';
-
-type Row = Record<string, unknown>;
-
-let agencyIdPromise: Promise<string> | null = null;
-
-/** Resolves (and on first use creates) the agency row this deployment serves. */
-function getAgencyId(): Promise<string> {
-  if (!agencyIdPromise) {
-    agencyIdPromise = (async () => {
-      const sql = getSql();
-      await sql`
-        insert into agencies (slug, name, name_he, preset, currency)
-        values (${env.agencySlug}, ${env.businessName || 'My business'}, ${env.businessNameHe || null}, ${env.preset}, ${env.currency})
-        on conflict (slug) do nothing`;
-      const [row] = await sql`select id from agencies where slug = ${env.agencySlug}`;
-      return String(row.id);
-    })().catch((error) => {
-      agencyIdPromise = null;
-      throw error;
-    });
-  }
-  return agencyIdPromise;
-}
-
-function fail<T>(error: unknown, fallback: string): ActionResult<T> {
-  const message = error instanceof Error ? error.message : fallback;
-  console.error(`[AgencyOS Postgres] ${fallback}: ${message}`);
-  return { ok: false, error: fallback };
-}
-
-function iso(value: unknown): string | undefined {
-  if (value instanceof Date) return value.toISOString();
-  return typeof value === 'string' && value ? value : undefined;
-}
 
 function mapCase(row: Row): CaseRecord {
   return {
@@ -72,15 +39,6 @@ function mapTemplate(row: Row): OnboardingTemplate {
   };
 }
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type JsonParam = Parameters<ReturnType<typeof getSql>['json']>[0];
-
-/** jsonb parameter. Passing JSON.stringify output instead makes the driver encode it twice. */
-function jsonb(value: unknown) {
-  return value === undefined || value === null ? null : getSql().json(value as JsonParam);
-}
-
 function mapDocument(row: Row, caseId: string): CaseDocumentRecord {
   return {
     recordId: String(row.id),
@@ -94,15 +52,9 @@ function mapDocument(row: Row, caseId: string): CaseDocumentRecord {
   };
 }
 
-async function caseUuid(caseId: string): Promise<string | null> {
-  const sql = getSql();
-  const agencyId = await getAgencyId();
-  const [row] = await sql`select id from cases where agency_id = ${agencyId} and case_number = ${caseId}`;
-  return row ? String(row.id) : null;
-}
-
 export const postgresStore: DataStore = {
   kind: 'postgres',
+  ...postgresBilling,
 
   async listCases() {
     try {

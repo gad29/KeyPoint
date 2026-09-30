@@ -1,29 +1,18 @@
-import { stripeAdapter } from '@/lib/billing/stripe';
-import { icountAdapter } from '@/lib/billing/icount';
 import { greenInvoiceAdapter } from '@/lib/billing/green-invoice';
+import { icountAdapter } from '@/lib/billing/icount';
 import { quickbooksAdapter } from '@/lib/billing/quickbooks';
 import { xeroAdapter } from '@/lib/billing/xero';
-import type { BillingAdapter, BillingAdapterId } from '@/lib/billing/types';
+import type { AccountingAdapter, AccountingProviderId } from '@/lib/billing/types';
 
-export type { BillingAdapter, BillingAdapterId, CreateInvoiceInput, ChaseSendInput } from '@/lib/billing/types';
+export type * from '@/lib/billing/types';
 
-const registry: Record<BillingAdapterId, BillingAdapter | undefined> = {
-  stripe: stripeAdapter,
-  icount: icountAdapter,
-  'green-invoice': greenInvoiceAdapter,
-  quickbooks: quickbooksAdapter,
-  xero: xeroAdapter,
-  internal: undefined,
-};
+const accountingAdapters: AccountingAdapter[] = [greenInvoiceAdapter, icountAdapter, quickbooksAdapter, xeroAdapter];
 
-export function getBillingAdapter(id: BillingAdapterId): BillingAdapter | undefined {
-  return registry[id];
+export function getAccountingAdapter(id: AccountingProviderId) {
+  return accountingAdapters.find((a) => a.id === id);
 }
 
-export function listConfiguredBillingAdapters(): BillingAdapter[] {
-  return Object.values(registry).filter((adapter): adapter is BillingAdapter => Boolean(adapter?.isConfigured()));
-}
-
-export function getPrimaryBillingAdapter(): BillingAdapter | undefined {
-  return listConfiguredBillingAdapters()[0];
+/** Configured providers that can actually issue a tax document today. */
+export function listIssuingAccountingAdapters() {
+  return accountingAdapters.filter((a) => a.isConfigured() && (a.id === 'green-invoice' || a.id === 'icount'));
 }

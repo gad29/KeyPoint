@@ -7,6 +7,7 @@ import { CaseTimeline } from '@/components/case-timeline';
 import { CaseDocuments } from '@/components/case-documents';
 import { InviteGenerator } from '@/components/forms/invite-generator';
 import { ContractSummary } from '@/components/onboarding/contract-summary';
+import { InvoicePanel } from '@/components/billing/invoice-panel';
 import type { PresetFeatures, PresetId } from '@/lib/presets';
 import { GENERIC_STAGE_KEYS, STAGE_LABELS_HE } from '@/lib/stage-labels';
 
@@ -73,7 +74,6 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist, presetId,
     ? Object.entries(STAGE_LABELS)
     : Object.entries(STAGE_LABELS).filter(([key]) => GENERIC_STAGE_KEYS.has(key));
   const [activeTab, setActiveTab] = useState<TabId>('details');
-  const [chaseStatus, setChaseStatus] = useState('');
   const [caseData, setCaseData] = useState(caseRecord);
   const [offers, setOffers] = useState(initialOffers);
   const [saving, setSaving] = useState(false);
@@ -351,50 +351,8 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist, presetId,
         </div>
       )}
 
-      {/* Tab: חיוב וגבייה (default preset + any preset with invoicing) */}
-      {activeTab === 'invoice' && presetFeatures.invoicing && (
-        <section className="card" style={{ display: 'grid', gap: 16 }}>
-          <p className="eyebrow">חיוב וגבייה</p>
-          <p className="muted">
-            שליחת חשבונית ומעקב תשלומים משיקים בשלב 4. השלב הנוכחי מציג את פעולות הקליק-אחד ומפעיל את הזרמת n8n כשקיימת.
-          </p>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="button"
-              onClick={async () => {
-                setChaseStatus('שולח לחשבונית…');
-                const res = await fetch('/api/invoices', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ caseId: caseData.id }),
-                });
-                const json = await res.json() as { ok: boolean; error?: string };
-                setChaseStatus(json.ok ? 'נשלח ✓' : json.error || 'נכשל');
-              }}
-            >
-              שליחת חשבונית
-            </button>
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={async () => {
-                setChaseStatus('מפעיל תזכורת תשלום…');
-                const res = await fetch('/api/chase', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ invoiceId: caseData.id }),
-                });
-                const json = await res.json() as { ok: boolean; error?: string };
-                setChaseStatus(json.ok ? 'תזכורת נשלחה ✓' : json.error || 'נכשל');
-              }}
-            >
-              תזכורת תשלום
-            </button>
-          </div>
-          {chaseStatus ? <p className="muted small">{chaseStatus}</p> : null}
-        </section>
-      )}
+      {/* Tab: חיוב וגבייה */}
+      {activeTab === 'invoice' && presetFeatures.invoicing && <InvoicePanel caseId={caseData.id} />}
 
       {/* Tab: הערות */}
       {activeTab === 'notes' && (

@@ -1,20 +1,13 @@
 import { hasQuickbooksConfig } from '@/lib/env';
-import type { BillingAdapter } from '@/lib/billing/types';
+import type { AccountingAdapter } from '@/lib/billing/types';
 
-/**
- * QuickBooks Online adapter — read-only in Phase 4 (sync of existing invoices).
- * Auth is OAuth2; the tenant connects via /admin/integrations.
- */
-export const quickbooksAdapter: BillingAdapter = {
+/** Placeholder: QuickBooks needs an OAuth app + per-tenant connect flow before invoices can sync. */
+export const quickbooksAdapter: AccountingAdapter = {
   id: 'quickbooks',
+  label: 'QuickBooks',
+  verified: false,
   isConfigured: hasQuickbooksConfig,
-  async createInvoice() {
-    return { ok: false, error: 'QuickBooks adapter is read-only (Phase 4).' };
-  },
-  async getInvoice() {
-    return { ok: false, error: 'QuickBooks adapter not implemented yet (Phase 4).' };
-  },
-  async listOverdue() {
-    return { ok: false, error: 'QuickBooks adapter not implemented yet (Phase 4).' };
+  async issueTaxDocument() {
+    return { ok: false, error: 'QuickBooks sync is not available yet (needs an OAuth connection).' };
   },
 };

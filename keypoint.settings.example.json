@@ -66,6 +66,9 @@
       "secretKey": "",
       "webhookSecret": ""
     },
+    "cronSecret": "",
+    "anthropicApiKey": "",
+    "anthropicModel": "",
     "icount": {
       "companyId": "",
       "user": "",
@@ -73,7 +76,8 @@
     },
     "greenInvoice": {
       "apiKey": "",
-      "apiSecret": ""
+      "apiSecret": "",
+      "apiBase": ""
     },
     "quickbooks": {
       "clientId": "",
@@ -99,6 +103,7 @@
       "webhookUrl": ""
     },
     "email": {
+      "$providerOptions": ["webhook", "resend"],
       "provider": "webhook",
       "fromAddress": "",
       "replyTo": "",

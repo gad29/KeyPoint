@@ -1,6 +1,7 @@
 import type { BankOffer, CaseRecord, CaseStage } from '@/data/domain';
 import type { DataBackend } from '@/lib/env';
 import type { AgencyBranding, ContractSignature, ContractSignatureInput, OnboardingTemplate } from '@/lib/onboarding/types';
+import type { BillingStore } from '@/lib/billing/types';
 import type { ActionResult, CaseUpdateInput, CreateBankOfferInput, CreateCaseInput, UploadRecord } from '@/lib/types';
 
 export interface CaseDocumentRecord {
@@ -77,7 +78,7 @@ export interface CaseLookupResult {
  * The single contract every storage backend implements. `caseId` is always the
  * public case number (e.g. CASE-1001), never a backend-internal id.
  */
-export interface DataStore {
+export interface DataStore extends BillingStore {
   kind: DataBackend;
 
   listCases(): Promise<ActionResult<CaseRecord[]>>;

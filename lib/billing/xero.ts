@@ -1,20 +1,13 @@
 import { hasXeroConfig } from '@/lib/env';
-import type { BillingAdapter } from '@/lib/billing/types';
+import type { AccountingAdapter } from '@/lib/billing/types';
 
-/**
- * Xero adapter — read-only in Phase 4 (sync of existing invoices).
- * Auth is OAuth2; the tenant connects via /admin/integrations.
- */
-export const xeroAdapter: BillingAdapter = {
+/** Placeholder: Xero needs an OAuth app + per-tenant connect flow before invoices can sync. */
+export const xeroAdapter: AccountingAdapter = {
   id: 'xero',
+  label: 'Xero',
+  verified: false,
   isConfigured: hasXeroConfig,
-  async createInvoice() {
-    return { ok: false, error: 'Xero adapter is read-only (Phase 4).' };
-  },
-  async getInvoice() {
-    return { ok: false, error: 'Xero adapter not implemented yet (Phase 4).' };
-  },
-  async listOverdue() {
-    return { ok: false, error: 'Xero adapter not implemented yet (Phase 4).' };
+  async issueTaxDocument() {
+    return { ok: false, error: 'Xero sync is not available yet (needs an OAuth connection).' };
   },
 };

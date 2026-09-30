@@ -68,6 +68,7 @@ function LogOutIcon() {
 const nav = [
   { href: '/admin', label: 'סקירה כספית', Icon: BarChartIcon, exact: true },
   { href: '/admin/onboarding', label: 'קליטת לקוחות', Icon: FolderIcon },
+  { href: '/admin/billing', label: 'הגדרות גבייה', Icon: BarChartIcon },
   { href: '/office/active', label: 'תיקים במשרד', Icon: OfficeIcon },
   { href: '/', label: 'אתר לקוחות', Icon: GlobeIcon, exact: true },
 ];

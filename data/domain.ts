@@ -271,58 +271,81 @@ export const sampleCases: CaseRecord[] = [
   },
 ];
 
-export type InvoiceStatus =
-  | 'draft'
-  | 'sent'
-  | 'viewed'
-  | 'partial'
-  | 'paid'
-  | 'overdue'
-  | 'written-off';
+export type InvoiceStatus = 'draft' | 'sent' | 'partial' | 'paid' | 'overdue' | 'void';
 
 export interface InvoiceLineItem {
   description: string;
   quantity: number;
+  /** Price per unit before VAT, in major units (e.g. 1500 = ₪1,500). */
   unitAmount: number;
 }
 
+/**
+ * A payment request issued by the app. It is not a legal tax invoice (חשבונית מס) unless
+ * an accounting provider (Green Invoice / iCount) issued one, recorded in externalId/externalDocUrl.
+ */
 export interface InvoiceRecord {
   id: string;
-  caseId: string;
+  caseId: string | null;
   number: string;
+  clientName: string;
+  clientEmail?: string;
+  clientPhone?: string;
   currency: string;
   lineItems: InvoiceLineItem[];
+  vatRate: number;
   subtotal: number;
   vatAmount: number;
   total: number;
-  issuedAt: string;
+  amountPaid: number;
+  summary?: string;
+  notes?: string;
+  status: InvoiceStatus;
+  issuedAt?: string;
   dueAt?: string;
   paidAt?: string;
-  status: InvoiceStatus;
-  /** Which provider created this invoice ('stripe' | 'icount' | 'green-invoice' | 'internal' | ...). */
+  viewedAt?: string;
+  createdAt: string;
+  /** Opaque token for the client-facing /pay page. */
+  publicToken: string;
+  chasePaused: boolean;
+  /** 'internal' or the accounting provider that issued the tax document. */
   sourceAdapter: string;
   externalId?: string;
-  payLinkUrl?: string;
+  externalDocUrl?: string;
+}
+
+export interface InvoicePayment {
+  id: string;
+  invoiceId: string;
+  amount: number;
+  method: string;
+  externalRef?: string;
+  paidAt: string;
 }
 
 export type ChaseTone = 'friendly' | 'reminder' | 'firm' | 'final';
 
 export interface ChaseStep {
+  /** Days after the due date. */
   dayOffset: number;
   tone: ChaseTone;
-  /** Prompt appended to the AI email brief for this step. */
-  aiPromptEn?: string;
-  aiPromptHe?: string;
 }
+
+export type ChaseRunStatus = 'draft' | 'sent' | 'skipped' | 'failed';
 
 export interface ChaseRun {
   id: string;
   invoiceId: string;
   stepIndex: number;
   tone: ChaseTone;
-  sentAt: string;
-  channel: 'email' | 'whatsapp' | 'sms';
-  status: 'sent' | 'opened' | 'replied' | 'paid' | 'paused';
+  channel: 'email' | 'whatsapp' | 'manual';
+  status: ChaseRunStatus;
+  subject: string;
+  body: string;
+  createdAt: string;
+  sentAt?: string;
+  error?: string;
 }
 
 export const defaultChaseCadence: ChaseStep[] = [

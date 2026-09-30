@@ -72,6 +72,17 @@ export const env = {
   /** Payment integrations (all optional). */
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  /** Override only for local testing against a Stripe mock. */
+  stripeApiBase: process.env.STRIPE_API_BASE,
+  greenInvoiceApiBase: process.env.GREEN_INVOICE_API_BASE,
+  icountApiBase: process.env.ICOUNT_API_BASE,
+  /** 'resend' sends directly with EMAIL_API_KEY; 'webhook' posts to EMAIL_PROVIDER_WEBHOOK_URL (e.g. n8n). */
+  emailProvider: (process.env.EMAIL_PROVIDER || '').trim().toLowerCase(),
+  /** Optional: Claude drafts payment reminders when set; otherwise built-in templates are used. */
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+  anthropicModel: process.env.ANTHROPIC_MODEL || '',
+  /** Shared secret for the scheduled reminder run (n8n or Vercel Cron). */
+  cronSecret: process.env.CRON_SECRET,
   icountCompanyId: process.env.ICOUNT_COMPANY_ID,
   icountUser: process.env.ICOUNT_USER,
   icountPassword: process.env.ICOUNT_PASSWORD,
@@ -204,6 +215,14 @@ export function hasQuickbooksConfig() {
 
 export function hasXeroConfig() {
   return Boolean(env.xeroClientId && env.xeroClientSecret);
+}
+
+export function canSendEmailDirectly() {
+  return env.emailProvider === 'resend' && Boolean(env.emailApiKey && env.emailFromAddress);
+}
+
+export function hasAnthropicConfig() {
+  return Boolean(env.anthropicApiKey && !looksLikePlaceholder(env.anthropicApiKey));
 }
 
 export function hasAnyBillingProvider() {

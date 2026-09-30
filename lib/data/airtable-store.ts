@@ -18,6 +18,7 @@ import { createStaffInAirtable, findStaffByEmail, listStaffUsers, updateStaffPas
 import { createAirtableFinanceTransaction, listRecentFinanceTransactions, logBillingEventToAirtable } from '@/lib/airtable-finance';
 import { appendUploadToFile, readUploadsFromFile } from '@/lib/data/json-file';
 import type { DataStore } from '@/lib/data/types';
+import { airtableBilling } from '@/lib/data/airtable-billing';
 import type { ActionResult } from '@/lib/types';
 
 const needsDatabase = { ok: false as const, error: 'Saving templates and branding needs the Postgres backend (DATABASE_URL).' };
@@ -31,6 +32,7 @@ function withId(result: { ok: boolean; data?: unknown; error?: string }): Action
 /** Airtable as system of record. Kept as a fully supported backend for existing tenants. */
 export const airtableStore: DataStore = {
   kind: 'airtable',
+  ...airtableBilling,
 
   listCases: listAirtableCases,
   getCase: getAirtableCaseByCaseId,

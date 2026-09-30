@@ -14,3 +14,4 @@ data/uploads/*
 !data/uploads/.gitkeep
 tsconfig.tsbuildinfo
 data/demo-db.json
+data/demo-billing.json

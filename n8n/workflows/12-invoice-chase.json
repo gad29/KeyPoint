@@ -1,0 +1,37 @@
+{
+  "name": "Agency OS | Daily payment-reminder run",
+  "nodes": [
+    {
+      "id": "dailyTrigger",
+      "name": "Every day at 10:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300],
+      "parameters": {
+        "rule": { "interval": [{ "field": "days", "daysInterval": 1, "triggerAtHour": 10 }] }
+      }
+    },
+    {
+      "id": "runChase",
+      "name": "Run reminders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.KEYPOINT_APP_BASE_URL }}/api/chase/run",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "x-cron-secret", "value": "={{ $env.CRON_SECRET }}" }] },
+        "options": { "timeout": 120000 }
+      }
+    }
+  ],
+  "connections": {
+    "Every day at 10:00": { "main": [[{ "node": "Run reminders", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "Asia/Jerusalem" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

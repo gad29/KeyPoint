@@ -22,6 +22,9 @@ function isProtectedOfficePath(request: NextRequest) {
   if (pathname.startsWith('/api/admin')) return true;
   if (/^\/api\/cases\/[^/]+(?:\/.*)?$/.test(pathname)) return true;
   if (pathname.startsWith('/api/files')) return true;
+  if (pathname.startsWith('/api/invoices')) return true;
+  // /api/chase/run authenticates with CRON_SECRET (or a staff session) inside the handler.
+  if (pathname.startsWith('/api/chase') && pathname !== '/api/chase/run') return true;
 
   // Listing all cases must never be public (office UI loads data server-side; this blocks direct API scraping).
   if (isCasesListPath(pathname) && (method === 'GET' || method === 'HEAD')) {

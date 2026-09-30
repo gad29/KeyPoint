@@ -59,7 +59,7 @@
     {
       "file": "12-invoice-chase.json",
       "preset": "default",
-      "purpose": "Escalating AI-drafted email cadence for overdue invoices (Phase 4)"
+      "purpose": "Daily at 10:00: calls /api/chase/run (with CRON_SECRET) to draft or send payment reminders"
     },
     {
       "file": "13-missing-docs-client-reminder-webhook.json",

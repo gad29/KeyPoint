@@ -37,7 +37,7 @@ Full plan: [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md).
 - **Phase 1** ✅ Preset system, generic wizard, invoice/chase scaffolding, mortgage flow preserved as preset
 - **Phase 2** ✅ Pluggable data layer: Postgres/Supabase (multi-tenant schema), Airtable, or zero-config demo
 - **Phase 3** ✅ Onboarding templates + editor, e-signature with audit trail, client portal with secure uploads, one-click missing-docs reminder, branding
-- **Phase 4** Billing + chase engine (Stripe first, then iCount / Green Invoice / QuickBooks / Xero)
+- **Phase 4** ✅ Payment requests, client payment page (Stripe card / your own link / bank details), reminder cadence with approval queue or auto-send, optional Claude drafting, Green Invoice & iCount tax invoices (beta)
 - **Phase 5** Polish (unified timeline, teams, WhatsApp/Slack)
 
 ## What works today
@@ -51,8 +51,11 @@ Full plan: [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md).
 - Data backend of your choice: Postgres/Supabase, Airtable, or a local demo file. See [`docs/database.md`](docs/database.md)
 - `POST /api/uploads` with n8n forwarding
 - Staff auth (bcrypt sessions)
-- Invoice + chase API stubs (`/api/invoices`, `/api/chase`) — Phase 4 wires the adapters end-to-end
-- Adapter scaffolds for Stripe, iCount, Green Invoice, QuickBooks, Xero
+- Payment requests with service summary, VAT and a client payment page (`/pay/<token>`). See [`docs/billing.md`](docs/billing.md)
+- Card payments through Stripe Checkout, confirmed by webhook and on return
+- Daily payment-reminder run (friendly → final) with an approval queue at `/office/billing`, or auto-send by email
+- Optional AI-drafted reminders (Claude), with built-in templates as fallback
+- Tax invoices via Green Invoice / iCount (beta); QuickBooks / Xero placeholders
 - Hebrew + English, RTL support
 
 ## Settings file flow
@@ -116,6 +119,9 @@ AGENCY_OS_PRESET=mortgage-advisor npm run dev
 - `/intake` — public onboarding wizard (default template; mortgage preset keeps its own)
 - `/w/:template` — onboarding link for a specific template
 - `/admin/onboarding` — template editor + branding
+- `/admin/billing` — billing settings and connection status
+- `/office/billing` — payments dashboard + reminder approval queue
+- `/pay/:token` — client payment page
 - `/progress/:token` — read-only client progress page
 - `/office/active` · `/office/stuck` · `/office/completed` — pipeline buckets
 - `/office/case/:caseId` — case detail (mortgage panels hidden unless mortgage preset)
@@ -132,8 +138,7 @@ AGENCY_OS_PRESET=mortgage-advisor npm run dev
 - `POST /api/cases/:caseId/remind` — prepare / send a missing-documents reminder (staff)
 - `GET /api/cases/:caseId/contract` — signature summaries (staff)
 - `GET|POST /api/admin/templates`, `DELETE /api/admin/templates/:slug`, `GET|PUT /api/admin/branding`
-- `GET /api/invoices` · `POST /api/invoices` — invoice CRUD *(scaffold; Phase 4)*
-- `GET /api/chase` · `POST /api/chase` — invoice chase engine *(scaffold; forwards to n8n if configured)*
+- Billing routes (invoices, reminders, Stripe checkout + webhook): see [`docs/billing.md`](docs/billing.md#api)
 - `POST /api/webhooks/n8n` — generic n8n forwarder
 
 ## Deploy
@@ -155,6 +160,7 @@ AGENCY_OS_PRESET=mortgage-advisor npm run dev
 - [`docs/presets.md`](docs/presets.md) — how to configure or add a preset
 - [`docs/database.md`](docs/database.md) — data backends, Supabase setup, migrations
 - [`docs/onboarding.md`](docs/onboarding.md) — templates, e-signature, client portal, reminders, storage
+- [`docs/billing.md`](docs/billing.md) — payment requests, Stripe, reminders, AI drafting, tax invoices
 - [`docs/integration-checklist.md`](docs/integration-checklist.md)
 - [`docs/automation-implementation.md`](docs/automation-implementation.md)
 - [`docs/n8n-workflows.md`](docs/n8n-workflows.md)

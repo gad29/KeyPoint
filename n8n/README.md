@@ -19,7 +19,7 @@ Agency OS ships as a preset-driven platform. A tenant's active preset (see `AGEN
 | `09-missing-docs-client-reminder.json` | default | Every 2 days: remind the office about cases with missing documents (Airtable-based) |
 | `10-appraiser-followup.json` | mortgage-advisor | Follow-up when an appraiser is late |
 | `11-receipt-pdf-generator.json` | mortgage-advisor | Generate a mortgage-advisor receipt PDF |
-| `12-invoice-chase.json` | default | *(Phase 4)* Escalating AI-drafted email cadence for overdue invoices |
+| `12-invoice-chase.json` | default | Daily at 10:00: calls `/api/chase/run` with `CRON_SECRET` to draft or send payment reminders (skip if you use Vercel Cron) |
 | `13-missing-docs-client-reminder-webhook.json` | default | Delivers the one-click “missing documents” reminder from the case page via your WhatsApp / email provider webhooks (`agency-os/missing-docs-reminder`) |
 
 Machine-readable list: [`workflows/manifest.json`](workflows/manifest.json).
