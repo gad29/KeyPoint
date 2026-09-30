@@ -105,7 +105,7 @@ const appEnv = {
   BUSINESS_LOGO_URL: business.logoUrl || '',
   BRAND_COLOR: business.brandColor || '',
   SUPABASE_URL: storage.mode === 'supabase' ? storage.supabaseUrl || '' : '',
-  SUPABASE_SERVICE_ROLE_KEY: storage.mode === 'supabase' ? storage.supabaseServiceRoleKey || '' : '',
+  SUPABASE_SECRET_KEY: storage.mode === 'supabase' ? storage.supabaseServiceRoleKey || '' : '',
   SUPABASE_STORAGE_BUCKET: storage.supabaseBucket || 'client-files',
   STRIPE_SECRET_KEY: billing.stripe?.secretKey || '',
   STRIPE_WEBHOOK_SECRET: billing.stripe?.webhookSecret || '',

@@ -65,7 +65,8 @@ export const env = {
   brandColor: (process.env.BRAND_COLOR || '').trim(),
   /** Optional Supabase Storage for uploads (otherwise files go to UPLOAD_DIR on local disk). */
   supabaseUrl: process.env.SUPABASE_URL,
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  // New Supabase projects issue an sb_secret_… key; older ones a service_role JWT. Either works.
+  supabaseServiceRoleKey: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY,
   supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'client-files',
   /** Currency for invoices/chase. Defaults to ILS for the Israeli market; overridable per tenant. */
   currency: (process.env.BUSINESS_CURRENCY || 'ILS').trim().toUpperCase(),

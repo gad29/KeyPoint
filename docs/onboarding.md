@@ -50,7 +50,7 @@ In `/admin/onboarding` → *Branding*: business name (Hebrew and English), logo 
 | Mode | When | Notes |
 |---|---|---|
 | Local disk (default) | Always available | Files go to `UPLOAD_DIR`. Fine for a VPS; **not** for Vercel or other serverless hosts, which lose files between requests. |
-| Supabase Storage | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_STORAGE_BUCKET` are set | Create a **private** bucket first. Downloads use short-lived signed URLs. |
+| Supabase Storage | `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (or the older `SUPABASE_SERVICE_ROLE_KEY`) and `SUPABASE_STORAGE_BUCKET` are set | Create a **private** bucket first. Downloads use short-lived signed URLs. |
 
 Files are only downloadable by signed-in staff (`/api/files/<id>`) and are always served as attachments.
 

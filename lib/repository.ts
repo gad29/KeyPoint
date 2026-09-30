@@ -410,7 +410,10 @@ export async function saveUpload(input: Omit<UploadRecord, 'id' | 'uploadedAt'>)
   };
 
   const recorded = await store.recordUpload(record);
-  if (!recorded.ok) {
+  if (recorded.ok && recorded.data?.id) {
+    // Postgres assigns its own id; use it so download links resolve.
+    record.id = recorded.data.id;
+  } else if (!recorded.ok) {
     logRepository('warn', 'Upload file saved but upload record failed', { caseId: record.caseId, error: recorded.error });
   }
 
