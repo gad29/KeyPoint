@@ -1,5 +1,6 @@
 import type { BankOffer, CaseRecord, CaseStage } from '@/data/domain';
 import type { DataBackend } from '@/lib/env';
+import type { AgencyBranding, ContractSignature, ContractSignatureInput, OnboardingTemplate } from '@/lib/onboarding/types';
 import type { ActionResult, CaseUpdateInput, CreateBankOfferInput, CreateCaseInput, UploadRecord } from '@/lib/types';
 
 export interface CaseDocumentRecord {
@@ -7,6 +8,7 @@ export interface CaseDocumentRecord {
   caseId: string;
   documentCode: string;
   status: string;
+  required?: boolean;
   uploadedFileUrl?: string;
   reviewNotes?: string;
   approvedAt?: string;
@@ -60,6 +62,11 @@ export interface BillingEventInput {
   triggeredByEmail?: string;
 }
 
+export interface SeedDocument {
+  code: string;
+  required: boolean;
+}
+
 export interface CaseLookupResult {
   caseId: string;
   leadName: string;
@@ -82,13 +89,26 @@ export interface DataStore {
 
   logActivity(caseId: string, eventType: string, summary: string, actor?: string): Promise<ActionResult<{ id: string }>>;
 
-  seedCaseDocuments(caseId: string, documentCodes: string[]): Promise<ActionResult<string[]>>;
+  seedCaseDocuments(caseId: string, documents: SeedDocument[]): Promise<ActionResult<string[]>>;
   createCaseDocument(caseId: string, documentCode: string, fileUrl: string, status?: string): Promise<ActionResult<{ id: string }>>;
   listCaseDocuments(caseId: string): Promise<ActionResult<CaseDocumentRecord[]>>;
   updateCaseDocumentStatus(caseId: string, documentCode: string, status: string, reviewNote?: string): Promise<ActionResult<CaseDocumentRecord>>;
 
   recordUpload(record: UploadRecord): Promise<ActionResult<{ id: string }>>;
   listUploads(caseId?: string): Promise<UploadRecord[]>;
+  getUpload(uploadId: string): Promise<UploadRecord | undefined>;
+
+  /** Stored templates only; the built-in preset template is added by lib/onboarding. */
+  listTemplates(): Promise<ActionResult<OnboardingTemplate[]>>;
+  getTemplate(slug: string): Promise<ActionResult<OnboardingTemplate | null>>;
+  saveTemplate(template: OnboardingTemplate): Promise<ActionResult<OnboardingTemplate>>;
+  deleteTemplate(slug: string): Promise<ActionResult<{ slug: string }>>;
+
+  saveContractSignature(caseId: string, signature: ContractSignatureInput): Promise<ActionResult<{ id: string }>>;
+  listContractSignatures(caseId: string): Promise<ActionResult<ContractSignature[]>>;
+
+  getBranding(): Promise<ActionResult<Partial<AgencyBranding>>>;
+  saveBranding(branding: AgencyBranding): Promise<ActionResult<AgencyBranding>>;
 
   listBankOffers(caseId: string): Promise<ActionResult<BankOffer[]>>;
   createBankOffer(input: CreateBankOfferInput): Promise<ActionResult<{ id: string }>>;

@@ -36,13 +36,16 @@ Full plan: [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md).
 - **Phase 0** ✅ Roadmap committed
 - **Phase 1** ✅ Preset system, generic wizard, invoice/chase scaffolding, mortgage flow preserved as preset
 - **Phase 2** ✅ Pluggable data layer: Postgres/Supabase (multi-tenant schema), Airtable, or zero-config demo
-- **Phase 3** Onboarding as a real product (templates, e-sign, branded portal)
+- **Phase 3** ✅ Onboarding templates + editor, e-signature with audit trail, client portal with secure uploads, one-click missing-docs reminder, branding
 - **Phase 4** Billing + chase engine (Stripe first, then iCount / Green Invoice / QuickBooks / Xero)
 - **Phase 5** Polish (unified timeline, teams, WhatsApp/Slack)
 
 ## What works today
 
-- Preset-driven public wizard at `/intake` — generic 3-step for `default`, full 5-step mortgage wizard for `mortgage-advisor`
+- Onboarding templates with shareable links (`/w/<template>`): questions, documents and an optional agreement to sign. See [`docs/onboarding.md`](docs/onboarding.md)
+- Client portal (`/progress/<token>`): progress, document checklist with uploads, signed-agreement status
+- One-click missing-documents reminder (WhatsApp, copy, or automatic via n8n)
+- Branding (name, logo, color) on client-facing pages
 - Signed client invite tokens + `/portal/[token]` progress link
 - Office dashboard (`/office/active`, `/stuck`, `/completed`) + case detail with document tracking
 - Data backend of your choice: Postgres/Supabase, Airtable, or a local demo file. See [`docs/database.md`](docs/database.md)
@@ -110,7 +113,9 @@ AGENCY_OS_PRESET=mortgage-advisor npm run dev
 ## Core routes
 
 - `/` — landing (preset-aware copy)
-- `/intake` — public onboarding wizard (shape depends on active preset)
+- `/intake` — public onboarding wizard (default template; mortgage preset keeps its own)
+- `/w/:template` — onboarding link for a specific template
+- `/admin/onboarding` — template editor + branding
 - `/progress/:token` — read-only client progress page
 - `/office/active` · `/office/stuck` · `/office/completed` — pipeline buckets
 - `/office/case/:caseId` — case detail (mortgage panels hidden unless mortgage preset)
@@ -122,7 +127,11 @@ AGENCY_OS_PRESET=mortgage-advisor npm run dev
 - `GET /api/cases/:caseId` · `PATCH /api/cases/:caseId` — read / update a case
 - `POST /api/cases/:caseId/offers` — mortgage-advisor preset only
 - `POST /api/invites` — signed client portal link
-- `POST /api/uploads` — file upload + n8n forward
+- `POST /api/uploads` — file upload; requires the client's signed link or a staff session
+- `GET /api/files/:id` — staff-only download
+- `POST /api/cases/:caseId/remind` — prepare / send a missing-documents reminder (staff)
+- `GET /api/cases/:caseId/contract` — signature summaries (staff)
+- `GET|POST /api/admin/templates`, `DELETE /api/admin/templates/:slug`, `GET|PUT /api/admin/branding`
 - `GET /api/invoices` · `POST /api/invoices` — invoice CRUD *(scaffold; Phase 4)*
 - `GET /api/chase` · `POST /api/chase` — invoice chase engine *(scaffold; forwards to n8n if configured)*
 - `POST /api/webhooks/n8n` — generic n8n forwarder
@@ -145,6 +154,7 @@ AGENCY_OS_PRESET=mortgage-advisor npm run dev
 - [`docs/agency-os-roadmap.md`](docs/agency-os-roadmap.md) — the pivot plan
 - [`docs/presets.md`](docs/presets.md) — how to configure or add a preset
 - [`docs/database.md`](docs/database.md) — data backends, Supabase setup, migrations
+- [`docs/onboarding.md`](docs/onboarding.md) — templates, e-signature, client portal, reminders, storage
 - [`docs/integration-checklist.md`](docs/integration-checklist.md)
 - [`docs/automation-implementation.md`](docs/automation-implementation.md)
 - [`docs/n8n-workflows.md`](docs/n8n-workflows.md)

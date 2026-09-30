@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { canAccessAdvisorFinanceDashboard } from '@/lib/staff-roles';
 import { getStaffSessionFromRequest } from '@/lib/staff-session';
+import { getDataBackend, isProductionLike } from '@/lib/env';
 
 function isCasesListPath(pathname: string) {
   return pathname === '/api/cases' || pathname === '/api/cases/';
@@ -19,7 +20,8 @@ function isProtectedOfficePath(request: NextRequest) {
   if (pathname.startsWith('/admin')) return true;
   if (pathname.startsWith('/api/invites')) return true;
   if (pathname.startsWith('/api/admin')) return true;
-  if (/^\/api\/cases\/[^/]+(?:\/offers|\/documents)?$/.test(pathname)) return true;
+  if (/^\/api\/cases\/[^/]+(?:\/.*)?$/.test(pathname)) return true;
+  if (pathname.startsWith('/api/files')) return true;
 
   // Listing all cases must never be public (office UI loads data server-side; this blocks direct API scraping).
   if (isCasesListPath(pathname) && (method === 'GET' || method === 'HEAD')) {
@@ -33,6 +35,11 @@ export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (!isProtectedOfficePath(request)) {
+    return NextResponse.next();
+  }
+
+  // Zero-config demo has no user store to log in against; open the office locally only.
+  if (getDataBackend() === 'demo' && !isProductionLike()) {
     return NextResponse.next();
   }
 

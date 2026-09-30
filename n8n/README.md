@@ -16,10 +16,11 @@ Agency OS ships as a preset-driven platform. A tenant's active preset (see `AGEN
 | `06-ai-review-handoff.json` | default | Send anonymized stage snapshot to the AI review pipeline |
 | `07-client-status-notifications.json` | default | Notify the client on status changes via WhatsApp/email fallback |
 | `08-secretary-daily-briefing.json` | default | Daily briefing of what needs attention |
-| `09-missing-docs-client-reminder.json` | default | One-click reminder for missing documents |
+| `09-missing-docs-client-reminder.json` | default | Every 2 days: remind the office about cases with missing documents (Airtable-based) |
 | `10-appraiser-followup.json` | mortgage-advisor | Follow-up when an appraiser is late |
 | `11-receipt-pdf-generator.json` | mortgage-advisor | Generate a mortgage-advisor receipt PDF |
 | `12-invoice-chase.json` | default | *(Phase 4)* Escalating AI-drafted email cadence for overdue invoices |
+| `13-missing-docs-client-reminder-webhook.json` | default | Delivers the one-click “missing documents” reminder from the case page via your WhatsApp / email provider webhooks (`agency-os/missing-docs-reminder`) |
 
 Machine-readable list: [`workflows/manifest.json`](workflows/manifest.json).
 

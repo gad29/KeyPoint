@@ -1,0 +1,94 @@
+{
+  "name": "Agency OS | Missing documents — client reminder (webhook)",
+  "nodes": [
+    {
+      "id": "reminderWebhook",
+      "name": "Reminder requested",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agency-os/missing-docs-reminder",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "hasPhone",
+      "name": "Has phone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 200],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "combinator": "and",
+          "conditions": [
+            { "leftValue": "={{ $json.body.phone }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sendWhatsapp",
+      "name": "Send via WhatsApp provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 200],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.WHATSAPP_PROVIDER_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { to: $json.body.phone, message: $json.body.message, caseId: $json.body.caseId, kind: 'missing-docs-reminder' } }}"
+      }
+    },
+    {
+      "id": "hasEmail",
+      "name": "Has email?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 420],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "combinator": "and",
+          "conditions": [
+            { "leftValue": "={{ $json.body.email }}", "rightValue": "", "operator": { "type": "string", "operation": "notEmpty", "singleValue": true } }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sendEmail",
+      "name": "Send via email provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, 420],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EMAIL_PROVIDER_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { to: $json.body.email, subject: $json.body.language === 'en' ? 'A few documents are still missing' : 'חסרים עוד כמה מסמכים', text: $json.body.message, caseId: $json.body.caseId } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Reminder requested": {
+      "main": [[
+        { "node": "Has phone?", "type": "main", "index": 0 },
+        { "node": "Has email?", "type": "main", "index": 0 }
+      ]]
+    },
+    "Has phone?": { "main": [[{ "node": "Send via WhatsApp provider", "type": "main", "index": 0 }], []] },
+    "Has email?": { "main": [[{ "node": "Send via email provider", "type": "main", "index": 0 }], []] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "pinData": {},
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

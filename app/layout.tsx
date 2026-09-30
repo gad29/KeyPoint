@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Heebo, Frank_Ruhl_Libre } from 'next/font/google';
 import './globals.css';
 import { RouteShell } from '@/components/route-shell';
+import { getBranding } from '@/lib/onboarding';
 
 const sans = Heebo({
   subsets: ['latin', 'latin-ext', 'hebrew'],
@@ -22,11 +23,12 @@ export const metadata: Metadata = {
   description: 'Client onboarding, service updates, invoicing and payment follow-up for small businesses.',
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const branding = await getBranding();
   return (
     <html lang="he" className={`${sans.variable} ${display.variable}`}>
       <body className={sans.className}>
-        <RouteShell>{children}</RouteShell>
+        <RouteShell branding={branding}>{children}</RouteShell>
       </body>
     </html>
   );

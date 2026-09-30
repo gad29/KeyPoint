@@ -7,6 +7,7 @@ import { PublicFrame } from '@/components/public-shell';
 import { OfficeFrame } from '@/components/office-shell';
 import { AdminFrame } from '@/components/admin-shell';
 import { PageEnterMotion } from '@/components/page-enter-motion';
+import type { AgencyBranding } from '@/lib/onboarding/types';
 
 function usesAdminChrome(pathname: string) {
   return pathname.startsWith('/admin');
@@ -20,7 +21,7 @@ function usesOfficeChrome(pathname: string) {
   );
 }
 
-function ShellRouter({ children }: { children: ReactNode }) {
+function ShellRouter({ children, branding }: { children: ReactNode; branding: AgencyBranding }) {
   const pathname = usePathname();
   if (usesAdminChrome(pathname)) {
     return <AdminFrame>{children}</AdminFrame>;
@@ -28,14 +29,14 @@ function ShellRouter({ children }: { children: ReactNode }) {
   if (usesOfficeChrome(pathname)) {
     return <OfficeFrame>{children}</OfficeFrame>;
   }
-  return <PublicFrame>{children}</PublicFrame>;
+  return <PublicFrame branding={branding}>{children}</PublicFrame>;
 }
 
-export function RouteShell({ children }: { children: ReactNode }) {
+export function RouteShell({ children, branding }: { children: ReactNode; branding: AgencyBranding }) {
   return (
     <I18nProvider>
       <PageEnterMotion>
-        <ShellRouter>{children}</ShellRouter>
+        <ShellRouter branding={branding}>{children}</ShellRouter>
       </PageEnterMotion>
     </I18nProvider>
   );

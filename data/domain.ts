@@ -92,6 +92,8 @@ export interface CaseRecord {
   nextAction: string;
   portalStatus?: string;
   airtableRecordId?: string;
+  /** Onboarding template the client signed up through (Postgres/demo backends). */
+  templateSlug?: string;
 }
 
 export interface BankOffer {

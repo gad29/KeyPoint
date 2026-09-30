@@ -2,13 +2,19 @@
 
 import { useI18n } from '@/components/i18n';
 import { CaseTimeline } from '@/components/case-timeline';
+import { DocumentUploader } from '@/components/onboarding/document-uploader';
 import type { BankOffer, CaseRecord, DocumentRequirement } from '@/data/domain';
+import type { PresetId } from '@/lib/presets/types';
 
 const copy = {
   en: {
     eyebrow: 'Client progress',
     titlePrefix: 'Case',
-    readOnly: 'Read-only view · Updates automatically as your file progresses',
+    readOnly: 'Your personal page · Upload documents here any time; it updates as your file moves forward',
+    uploadTitle: 'Upload documents',
+    allDone: 'All required documents are in. Thank you!',
+    contractTitle: 'Agreement',
+    contractSigned: (name: string, date: string) => `Signed by ${name} on ${date}`,
     noCase: 'Progress link unavailable',
     noCaseText: 'Ask the office for a fresh progress link.',
     currentStage: 'Current stage',
@@ -29,7 +35,11 @@ const copy = {
   he: {
     eyebrow: 'התקדמות התיק',
     titlePrefix: 'תיק',
-    readOnly: 'תצוגת לקוח · מתעדכן אוטומטית כשהתיק מתקדם',
+    readOnly: 'הדף האישי שלך · אפשר להעלות כאן מסמכים בכל זמן; הדף מתעדכן כשהתיק מתקדם',
+    uploadTitle: 'העלאת מסמכים',
+    allDone: 'כל מסמכי החובה התקבלו. תודה!',
+    contractTitle: 'הסכם',
+    contractSigned: (name: string, date: string) => `נחתם על ידי ${name} בתאריך ${date}`,
     noCase: 'קישור ההתקדמות לא זמין',
     noCaseText: 'יש לבקש מהמשרד קישור התקדמות חדש.',
     currentStage: 'שלב נוכחי',
@@ -100,12 +110,20 @@ function DocList({ docs, language }: { docs: DocWithRequired[]; language: 'en' |
 }
 
 export function PortalPageClient({
+  token,
+  presetId = 'default',
+  showBankOffers = false,
   caseRecord,
   requiredDocuments,
   offers = [],
   docStatuses = {},
+  signature,
   secretaryWhatsapp,
 }: {
+  token?: string;
+  presetId?: PresetId;
+  showBankOffers?: boolean;
+  signature?: { title: string; signerName: string; signedAt: string } | null;
   caseRecord?: CaseRecord;
   requiredDocuments: DocWithRequired[];
   offers?: BankOffer[];
@@ -177,7 +195,7 @@ export function PortalPageClient({
       {/* Stage timeline */}
       <section className="card" style={{ padding: '16px 20px' }}>
         <p className="eyebrow" style={{ marginBottom: 10 }}>{t.currentStage}</p>
-        <CaseTimeline currentStage={caseRecord.stage} />
+        <CaseTimeline currentStage={caseRecord.stage} presetId={presetId} />
       </section>
 
       {/* Documents */}
@@ -225,7 +243,38 @@ export function PortalPageClient({
         )}
       </section>
 
-      {/* Bank offers */}
+      {token && requiredDocuments.length ? (
+        <section className="card">
+          <p className="eyebrow" style={{ marginBottom: 6 }}>{t.uploadTitle}</p>
+          {missing.length === 0 ? <p className="muted" style={{ marginTop: 0 }}>{t.allDone}</p> : null}
+          <DocumentUploader
+            caseId={caseRecord.id}
+            token={token}
+            items={requiredDocuments
+              .filter((doc) => presetId !== 'mortgage-advisor' || doc.required || docStatuses[doc.code])
+              .map((doc) => ({
+                code: doc.code,
+                labelEn: doc.labelEn,
+                labelHe: doc.labelHe,
+                required: Boolean(doc.required),
+                status: docStatuses[doc.code],
+              }))}
+          />
+        </section>
+      ) : null}
+
+      {signature ? (
+        <section className="card">
+          <p className="eyebrow" style={{ marginBottom: 6 }}>{t.contractTitle}</p>
+          <p style={{ margin: 0, fontWeight: 600 }}>✓ {signature.title}</p>
+          <p className="muted" style={{ margin: '4px 0 0', fontSize: 13 }}>
+            {t.contractSigned(signature.signerName, new Date(signature.signedAt).toLocaleDateString(language === 'he' ? 'he-IL' : 'en-GB'))}
+          </p>
+        </section>
+      ) : null}
+
+      {/* Bank offers (mortgage-advisor preset) */}
+      {showBankOffers ? (
       <section className="card">
         <p className="eyebrow" style={{ marginBottom: 14 }}>{t.offers}</p>
         {offers.length === 0 ? (
@@ -279,6 +328,7 @@ export function PortalPageClient({
           </div>
         )}
       </section>
+      ) : null}
     </div>
   );
 }

@@ -60,6 +60,13 @@ export const env = {
   businessNameHe: process.env.BUSINESS_NAME_HE || '',
   businessTagline: process.env.BUSINESS_TAGLINE || '',
   businessTaglineHe: process.env.BUSINESS_TAGLINE_HE || '',
+  businessLogoUrl: process.env.BUSINESS_LOGO_URL || '',
+  /** Hex brand color, e.g. #1f6f5c. Overridable in the admin onboarding page. */
+  brandColor: (process.env.BRAND_COLOR || '').trim(),
+  /** Optional Supabase Storage for uploads (otherwise files go to UPLOAD_DIR on local disk). */
+  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'client-files',
   /** Currency for invoices/chase. Defaults to ILS for the Israeli market; overridable per tenant. */
   currency: (process.env.BUSINESS_CURRENCY || 'ILS').trim().toUpperCase(),
   /** Payment integrations (all optional). */
@@ -173,6 +180,10 @@ export function hasAiReviewConfig() {
 
 export function isLocalUploadMode() {
   return !env.uploadPublicBaseUrl;
+}
+
+export function hasSupabaseStorageConfig() {
+  return Boolean(env.supabaseUrl && env.supabaseServiceRoleKey && !looksLikePlaceholder(env.supabaseServiceRoleKey));
 }
 
 export function hasStripeConfig() {

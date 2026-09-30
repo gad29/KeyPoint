@@ -18,6 +18,8 @@
     "tagline": "",
     "taglineHe": "",
     "currency": "ILS",
+    "logoUrl": "",
+    "brandColor": "",
     "$currencyExamples": ["ILS", "USD", "EUR", "GBP"]
   },
   "database": {
@@ -46,7 +48,11 @@
     }
   },
   "storage": {
+    "$comment": "mode: local (disk) or supabase (Supabase Storage; needs supabaseUrl + serviceRoleKey + bucket)",
     "mode": "local",
+    "supabaseUrl": "",
+    "supabaseServiceRoleKey": "",
+    "supabaseBucket": "client-files",
     "uploadDir": "./data/uploads",
     "uploadPublicBaseUrl": "",
     "maxFileBytes": 15728640

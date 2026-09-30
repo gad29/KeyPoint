@@ -139,7 +139,25 @@ Original plan:
 
 **Ship criterion**: sign up as an agency, log in, see empty client list.
 
-### Phase 3 — Onboarding as a real product (1–2 sessions)
+### Phase 3 — Onboarding as a real product ✅ (done 2026-09-30)
+
+Shipped (details in `docs/onboarding.md`):
+- Template model + admin editor (`/admin/onboarding`): steps, typed fields, documents, optional bilingual agreement with placeholders and a sample text.
+- Public links `/w/<template>`; `/intake` serves the default template. Drafts autosave.
+- E-signature: canvas signing; server stores rendered text, SHA-256, signer, time, IP, browser; printable staff view.
+- Client portal with document checklist and uploads (XHR progress), signed-agreement status.
+- Uploads now require the client's signed link or staff session (previously anyone with a case number could upload). Storage adapter: local disk or Supabase Storage. Staff-only downloads.
+- One-click missing-documents reminder (WhatsApp deep link / copy / n8n workflow 13).
+- Branding (name, logo, color) with the theme's accents now fully variable-driven.
+- Client link tokens no longer carry name/phone.
+- Fixed: jsonb values double-encoded on Postgres (migration 003 repairs existing rows).
+
+Not done / later:
+- PDF export of signed agreements (Hebrew RTL needs font embedding); browser print covers it for now.
+- Per-client pre-filled onboarding links; letting secretary roles copy template links from the office.
+- Notion / Google Drive sync on submission.
+
+Original plan:
 - `OnboardingTemplate` editor in `/admin/templates` — steps, required assets, contract picker.
 - Public wizard `/w/[agencySlug]/[templateSlug]` reads a template and renders it.
 - Uploads: swap local disk for Supabase Storage; drag-and-drop with progress.

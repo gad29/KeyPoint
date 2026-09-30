@@ -891,18 +891,19 @@ export async function createAirtableCaseContact(caseId: string, contact: CaseCon
   return createAirtableRecord(env.airtableClientsTable, mapped.fields);
 }
 
-export async function seedAirtableCaseDocuments(caseId: string, documentCodes: string[]) {
+export async function seedAirtableCaseDocuments(caseId: string, documents: Array<{ code: string; required: boolean }>) {
+  const documentCodes = documents.map((d) => d.code);
   const schema = await getTableSchema(env.airtableDocumentsTable, documentFieldAliases);
 
   const results = await Promise.all(
-    documentCodes.map(async (documentCode) => {
+    documents.map(async ({ code: documentCode, required }) => {
       const mapped = buildWriteFields(
         schema,
         documentFieldAliases,
         {
           caseLink: caseId,
           documentCode,
-          required: true,
+          required,
           status: 'not-uploaded',
         },
         { required: ['caseLink', 'documentCode', 'status'], table: env.airtableDocumentsTable },

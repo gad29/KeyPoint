@@ -142,6 +142,7 @@ const copy = {
     resumeFoundTitle: 'We found an existing case for this ID',
     resumeFoundBody: 'You can continue with your existing case instead of starting over.',
     resumeGo: 'Continue existing case',
+    resumeNoUpload: 'We found your file. The office will send you a personal link for uploading documents.',
     resumeDismiss: 'Start a new one',
     resumeCaseLabel: 'Existing case',
   },
@@ -218,6 +219,7 @@ const copy = {
     resumeFoundTitle: 'מצאנו תיק קיים עם תעודת הזהות הזו',
     resumeFoundBody: 'ניתן להמשיך עם התיק הקיים במקום לפתוח אחד חדש.',
     resumeGo: 'המשך לתיק הקיים',
+    resumeNoUpload: 'מצאנו את התיק שלך. המשרד ישלח לך קישור אישי להעלאת מסמכים.',
     resumeDismiss: 'התחל תיק חדש',
     resumeCaseLabel: 'תיק קיים',
   },
@@ -298,7 +300,7 @@ export function IntakeForm() {
   const [error, setError] = useState('');
   const [filesByCode, setFilesByCode] = useState<Record<string, File | null>>({});
   const [success, setSuccess] = useState<
-    null | { caseId: string; submissionId: string; intakeSource: string; seededDocuments: string[]; uploadFailures: string[] }
+    null | { caseId: string; submissionId: string; intakeSource: string; seededDocuments: string[]; uploadFailures: string[]; token?: string }
   >(null);
 
   // Resume-by-ID banner state
@@ -466,6 +468,7 @@ export function IntakeForm() {
       const json = await response.json();
       if (!response.ok || !json.ok) throw new Error(json.error || t.submitFail);
       const caseId = json.data?.id || 'pending';
+      const token: string = json.meta?.portalToken || '';
       const uploadFailures: string[] = [];
       for (const code of requiredCodes) {
         const file = filesByCode[code];
@@ -474,6 +477,7 @@ export function IntakeForm() {
         fd.append('file', file);
         fd.append('caseId', caseId);
         fd.append('documentCode', code);
+        fd.append('token', token);
         const up = await fetch('/api/uploads', { method: 'POST', body: fd });
         if (!up.ok) uploadFailures.push(code);
       }
@@ -484,6 +488,7 @@ export function IntakeForm() {
         intakeSource: json.meta?.source || 'native-intake',
         seededDocuments: Array.isArray(json.meta?.seededDocuments) ? json.meta.seededDocuments : [],
         uploadFailures,
+        token,
       });
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : t.submitFailShort);
@@ -544,11 +549,18 @@ export function IntakeForm() {
             </button>
           </div>
         </section>
-        <UploadForm
-          caseId={success.caseId}
-          allowedDocumentCodes={success.seededDocuments}
-          defaultDocumentCode={success.seededDocuments[0] || 'id-card'}
-        />
+        {success.token ? (
+          <UploadForm
+            caseId={success.caseId}
+            token={success.token}
+            allowedDocumentCodes={success.seededDocuments}
+            defaultDocumentCode={success.seededDocuments[0] || 'id-card'}
+          />
+        ) : (
+          <section className="card">
+            <p className="muted" style={{ margin: 0 }}>{t.resumeNoUpload}</p>
+          </section>
+        )}
       </div>
     );
   }

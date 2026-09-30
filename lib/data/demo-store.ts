@@ -3,6 +3,7 @@ import path from 'node:path';
 import { sampleCases, sampleOffers, type BankOffer, type CaseRecord } from '@/data/domain';
 import { appendUploadToFile, dataRoot, readJson, readUploadsFromFile, writeJson } from '@/lib/data/json-file';
 import type { CaseContactInput, CaseDocumentRecord, DataStore } from '@/lib/data/types';
+import type { AgencyBranding, ContractSignature, OnboardingTemplate } from '@/lib/onboarding/types';
 
 type DemoDb = {
   caseSeq: number;
@@ -10,6 +11,9 @@ type DemoDb = {
   contacts: Array<CaseContactInput & { id: string; caseId: string }>;
   documents: CaseDocumentRecord[];
   offers: Array<BankOffer & { caseId: string }>;
+  templates?: OnboardingTemplate[];
+  signatures?: ContractSignature[];
+  branding?: Partial<AgencyBranding>;
 };
 
 const dbFile = path.join(dataRoot, 'demo-db.json');
@@ -65,6 +69,7 @@ export const demoStore: DataStore = {
         portalStatus: input.portalStatus || 'not-invited',
         notes: input.notes,
         answers: input.answers,
+        templateSlug: input.templateSlug,
       };
       db.cases.push(created);
       return created;
@@ -104,13 +109,13 @@ export const demoStore: DataStore = {
     return { ok: true, data: { id: crypto.randomUUID() } };
   },
 
-  async seedCaseDocuments(caseId, codes) {
+  async seedCaseDocuments(caseId, documents) {
     mutate((db) => {
-      for (const code of codes) {
-        db.documents.push({ recordId: crypto.randomUUID(), caseId, documentCode: code, status: 'not-uploaded' });
+      for (const doc of documents) {
+        db.documents.push({ recordId: crypto.randomUUID(), caseId, documentCode: doc.code, required: doc.required, status: 'not-uploaded' });
       }
     });
-    return { ok: true, data: codes };
+    return { ok: true, data: documents.map((d) => d.code) };
   },
 
   async createCaseDocument(caseId, documentCode, fileUrl, status = 'uploaded') {
@@ -151,6 +156,56 @@ export const demoStore: DataStore = {
 
   async listUploads(caseId) {
     return readUploadsFromFile(caseId);
+  },
+
+  async getUpload(uploadId) {
+    return readUploadsFromFile().find((u) => u.id === uploadId);
+  },
+
+  async listTemplates() {
+    return { ok: true, data: load().templates ?? [] };
+  },
+
+  async getTemplate(slug) {
+    return { ok: true, data: (load().templates ?? []).find((t) => t.slug === slug) ?? null };
+  },
+
+  async saveTemplate(template) {
+    mutate((db) => {
+      const list = (db.templates ??= []);
+      const index = list.findIndex((t) => t.slug === template.slug);
+      if (index >= 0) list[index] = template;
+      else list.push(template);
+    });
+    return { ok: true, data: template };
+  },
+
+  async deleteTemplate(slug) {
+    mutate((db) => {
+      db.templates = (db.templates ?? []).filter((t) => t.slug !== slug);
+    });
+    return { ok: true, data: { slug } };
+  },
+
+  async saveContractSignature(caseId, signature) {
+    const id = crypto.randomUUID();
+    mutate((db) => (db.signatures ??= []).push({ ...signature, id, caseId, signedAt: new Date().toISOString() }));
+    return { ok: true, data: { id } };
+  },
+
+  async listContractSignatures(caseId) {
+    return { ok: true, data: (load().signatures ?? []).filter((s) => s.caseId === caseId) };
+  },
+
+  async getBranding() {
+    return { ok: true, data: load().branding ?? {} };
+  },
+
+  async saveBranding(branding) {
+    mutate((db) => {
+      db.branding = branding;
+    });
+    return { ok: true, data: branding };
   },
 
   async listBankOffers(caseId) {

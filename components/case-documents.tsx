@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 import type { DocumentRequirement } from '@/data/domain';
 import type { CaseDocumentRecord } from '@/lib/data';
+import { MissingDocsReminder } from '@/components/onboarding/missing-docs-reminder';
+
+type UploadedFile = { id: string; documentCode: string; fileName: string; uploadedAt: string };
 
 const STATUS_LABELS: Record<string, string> = {
   'not-uploaded': 'לא הועלה',
@@ -19,6 +22,7 @@ const GROUP_LABELS: Record<string, string> = {
   Banking: 'בנק',
   Property: 'נכס',
   Process: 'תהליך',
+  Documents: 'מסמכים',
 };
 
 type ChecklistItem = DocumentRequirement & { required: boolean };
@@ -41,13 +45,15 @@ function statusCounts(checklist: ChecklistItem[], liveStatuses: Record<string, s
 
 export function CaseDocuments({ caseId, checklist }: Props) {
   const [liveStatuses, setLiveStatuses] = useState<Record<string, string>>({});
+  const [files, setFiles] = useState<UploadedFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/cases/${caseId}/documents`)
       .then((r) => r.json())
-      .then((d: { ok: boolean; data?: CaseDocumentRecord[] }) => {
+      .then((d: { ok: boolean; data?: CaseDocumentRecord[]; uploads?: UploadedFile[] }) => {
+        if (d.uploads) setFiles(d.uploads);
         if (d.ok && d.data) {
           const map: Record<string, string> = {};
           for (const doc of d.data) {
@@ -77,12 +83,18 @@ export function CaseDocuments({ caseId, checklist }: Props) {
   }
 
   const groups = Array.from(new Set(checklist.map((d) => d.group)));
+  const knownCodes = new Set(checklist.map((d) => d.code));
+  const extraFiles = files.filter((f) => !knownCodes.has(f.documentCode));
+  const filesFor = (code: string) => files.filter((f) => f.documentCode === code);
   const counts = statusCounts(checklist, liveStatuses);
 
   if (loading) return <div className="card muted" style={{ padding: 24 }}>טוען מסמכים…</div>;
 
   return (
+    <div className="grid" style={{ gap: 16 }}>
+    <MissingDocsReminder caseId={caseId} hasMissing={counts.missing > 0} />
     <div className="card">
+      {checklist.length === 0 ? <p className="muted" style={{ marginTop: 0 }}>לתיק הזה אין רשימת מסמכים. קבצים שהלקוח מעלה יופיעו כאן.</p> : null}
       {/* Summary bar */}
       <div className="docs-summary-bar">
         <div className="docs-summary-item">
@@ -116,6 +128,7 @@ export function CaseDocuments({ caseId, checklist }: Props) {
                     {!doc.required && (
                       <span className="muted" style={{ fontSize: 11, marginRight: 6 }}>(אופציונלי)</span>
                     )}
+                    <FileLinks files={filesFor(doc.code)} />
                   </div>
                   <span className={`doc-status-badge ${status}`}>
                     {STATUS_LABELS[status] ?? status}
@@ -171,6 +184,34 @@ export function CaseDocuments({ caseId, checklist }: Props) {
           </div>
         );
       })}
+
+      {extraFiles.length ? (
+        <div>
+          <div className="doc-group-title">קבצים נוספים</div>
+          <div className="doc-row">
+            <div className="doc-name">
+              <FileLinks files={extraFiles} />
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
+    </div>
+  );
+}
+
+function FileLinks({ files }: { files: UploadedFile[] }) {
+  if (!files.length) return null;
+  return (
+    <ul className="doc-file-links">
+      {files.map((file) => (
+        <li key={file.id}>
+          <a href={`/api/files/${file.id}`} className="mini-link">
+            ⤓ {file.fileName}
+          </a>
+          <span className="muted"> · {new Date(file.uploadedAt).toLocaleDateString('he-IL')}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

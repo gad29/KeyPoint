@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listCases, createCase, createIntakeCase } from '@/lib/repository';
+import { listCases, createCase, createIntakeCase, issueClientLink } from '@/lib/repository';
 import { env, getDataBackend } from '@/lib/env';
 import { getRequiredDocumentCodes, summarizeIntakeForNotes, makeNativeIntakeSubmissionId, type IntakePayload } from '@/lib/intake';
 import { postJson, triggerN8n } from '@/lib/n8n';
 import { currentRequestHasStaffSession } from '@/lib/staff-session';
 import type { CaseContactInput } from '@/lib/data';
+import { submitOnboarding } from '@/lib/onboarding/submit';
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -72,78 +73,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.source === 'generic-intake') {
-    const answers = isObject(body.answers) ? (body.answers as Record<string, unknown>) : null;
-    if (!answers) {
-      return NextResponse.json({ ok: false, error: 'answers object is required' }, { status: 400 });
-    }
-
-    const fullName = typeof answers.fullName === 'string' ? answers.fullName.trim() : '';
-    const phone = typeof answers.phone === 'string' ? answers.phone.trim() : '';
-    const privacyAccepted = answers.privacyAccepted === true;
-    const accuracyConfirmed = answers.accuracyConfirmed === true;
-
-    if (!fullName || !phone || !privacyAccepted || !accuracyConfirmed) {
-      return NextResponse.json(
-        { ok: false, error: 'fullName, phone, and both consent checkboxes are required.' },
-        { status: 400 },
-      );
-    }
-
-    const submissionId = makeNativeIntakeSubmissionId();
-    const notesLines = ['Intake source: generic-intake', ''];
-    for (const [key, value] of Object.entries(answers)) {
-      notesLines.push(`- ${key}: ${Array.isArray(value) ? value.join(', ') : String(value)}`);
-    }
-
-    const result = await createIntakeCase({
-      leadName: fullName,
-      phone,
-      email: typeof answers.email === 'string' && answers.email.trim() ? answers.email.trim() : undefined,
-      caseType: 'service-engagement',
-      borrowerProfiles: [],
-      notes: notesLines.join('\n'),
-      submissionId,
-      stage: 'intake-submitted',
-      source: 'generic-intake',
-      answers,
-      contacts: [
-        {
-          fullName,
-          phone,
-          email: typeof answers.email === 'string' ? answers.email.trim() : undefined,
-          role: 'primary',
-        },
-      ],
-      requiredDocumentCodes: [],
+    const result = await submitOnboarding(body, {
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || undefined,
+      userAgent: req.headers.get('user-agent') || undefined,
     });
-
-    if (!result.ok || !result.data) {
-      const errorMessage = result.error || 'Failed to create case';
-      return NextResponse.json(
-        { ok: false, error: errorMessage, meta: { source: 'generic-intake', submissionId } },
-        { status: 400 },
-      );
+    const created = result.body.data as { id: string; leadName: string } | undefined;
+    if (result.body.ok && created) {
+      const alertResult = await notifyNewIntake(created.id, created.leadName, '');
+      if (!alertResult.ok) {
+        console.warn(`[AgencyOS API] Intake created but office alert failed ${JSON.stringify({ caseId: created.id, error: alertResult.error })}`);
+      }
     }
-
-    const alertResult = await notifyNewIntake(result.data.id, result.data.leadName, result.data.phone);
-    if (!alertResult.ok) {
-      console.warn(
-        `[AgencyOS API] Generic intake created but office alert failed ${JSON.stringify({ caseId: result.data.id, error: alertResult.error })}`,
-      );
-    }
-
-    return NextResponse.json(
-      {
-        ok: true,
-        data: result.data,
-        meta: {
-          source: 'generic-intake',
-          submissionId,
-          automationTriggered: Boolean(env.officeAlertWebhookUrl || env.n8nWebhookBaseUrl),
-        },
-      },
-      { status: 201 },
-    );
+    return NextResponse.json(result.body, { status: result.status });
   }
 
   if (body.source === 'native-intake') {
@@ -190,7 +131,7 @@ export async function POST(req: NextRequest) {
       source: 'native-intake',
       answers: intake,
       contacts,
-      requiredDocumentCodes: getRequiredDocumentCodes(intake.caseType, intake.incomeProfile.borrowerProfiles),
+      documents: getRequiredDocumentCodes(intake.caseType, intake.incomeProfile.borrowerProfiles).map((code) => ({ code, required: true })),
     });
 
     if (!result.ok || !result.data) {
@@ -212,6 +153,7 @@ export async function POST(req: NextRequest) {
           source: 'native-intake',
           submissionId,
           seededDocuments: result.meta?.requiredDocumentCodes || [],
+          portalToken: issueClientLink(result.data).token,
           clientsCreated: result.meta?.clientsCreated || 0,
           warnings: result.meta?.warnings || [],
           automationTriggered: Boolean(env.officeAlertWebhookUrl || env.n8nWebhookBaseUrl),

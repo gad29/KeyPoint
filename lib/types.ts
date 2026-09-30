@@ -32,6 +32,7 @@ export interface CreateCaseInput {
   missingItemsCount?: number;
   portalStatus?: string;
   nextAction?: string;
+  templateSlug?: string;
 }
 
 export interface CaseUpdateInput {

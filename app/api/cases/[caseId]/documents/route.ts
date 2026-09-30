@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
-import { listCaseDocuments, updateCaseDocumentStatus } from '@/lib/repository';
+import { listCaseDocuments, listUploads, updateCaseDocumentStatus } from '@/lib/repository';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ caseId: string }> }) {
   const { caseId } = await params;
-  const docs = await listCaseDocuments(caseId);
-  return NextResponse.json({ ok: true, data: docs });
+  const [docs, uploads] = await Promise.all([listCaseDocuments(caseId), listUploads(caseId)]);
+  return NextResponse.json({
+    ok: true,
+    data: docs,
+    uploads: uploads.map((u) => ({ id: u.id, documentCode: u.documentCode, fileName: u.fileName, uploadedAt: u.uploadedAt })),
+  });
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ caseId: string }> }) {

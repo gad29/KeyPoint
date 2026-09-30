@@ -3,6 +3,7 @@ import { env } from '@/lib/env';
 import { normalizeStaffRole } from '@/lib/staff-roles';
 import { getSql } from '@/lib/data/postgres-client';
 import type { CaseDocumentRecord, DataStore, FinanceTransactionRow } from '@/lib/data/types';
+import type { ContractSignature, OnboardingTemplate } from '@/lib/onboarding/types';
 import type { ActionResult, UploadRecord } from '@/lib/types';
 
 type Row = Record<string, unknown>;
@@ -54,7 +55,30 @@ function mapCase(row: Row): CaseRecord {
     bankTargets: (row.bank_targets as string[]) || [],
     nextAction: String(row.next_action || ''),
     portalStatus: (row.portal_status as string) || undefined,
+    templateSlug: (row.template_slug as string) || undefined,
   };
+}
+
+function mapTemplate(row: Row): OnboardingTemplate {
+  return {
+    slug: String(row.slug),
+    name: String(row.name),
+    nameHe: String(row.name_he || row.name),
+    description: (row.description as string) || undefined,
+    steps: (row.steps as OnboardingTemplate['steps']) || [],
+    documents: (row.required_assets as OnboardingTemplate['documents']) || [],
+    contract: (row.contract as OnboardingTemplate['contract']) || null,
+    active: Boolean(row.active),
+  };
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type JsonParam = Parameters<ReturnType<typeof getSql>['json']>[0];
+
+/** jsonb parameter. Passing JSON.stringify output instead makes the driver encode it twice. */
+function jsonb(value: unknown) {
+  return value === undefined || value === null ? null : getSql().json(value as JsonParam);
 }
 
 function mapDocument(row: Row, caseId: string): CaseDocumentRecord {
@@ -63,6 +87,7 @@ function mapDocument(row: Row, caseId: string): CaseDocumentRecord {
     caseId,
     documentCode: String(row.document_code),
     status: String(row.status),
+    required: Boolean(row.required),
     uploadedFileUrl: (row.uploaded_file_url as string) || undefined,
     reviewNotes: (row.review_notes as string) || undefined,
     approvedAt: iso(row.approved_at),
@@ -112,14 +137,15 @@ export const postgresStore: DataStore = {
           insert into cases (
             agency_id, case_number, lead_name, spouse_name, phone, email, stage, case_type,
             borrower_profiles, missing_items, assigned_to, next_action, portal_status, notes,
-            source, submission_id, answers
+            source, submission_id, answers, template_slug
           ) values (
             ${agencyId}, ${`CASE-${seq.case_seq}`}, ${input.leadName}, ${input.spouseName || null},
             ${input.phone}, ${input.email || null}, ${input.stage || 'new-lead'}, ${input.caseType},
             ${input.borrowerProfiles}::text[], ${input.missingItemsCount ?? 0}, ${input.assignedTo || 'Unassigned'},
             ${input.nextAction || 'Review intake and move the case forward.'}, ${input.portalStatus || 'not-invited'},
             ${`${input.notes || ''}${source}`.trim()}, ${input.source || null}, ${input.submissionId || null},
-            ${input.answers === undefined ? null : JSON.stringify(input.answers)}::jsonb
+            ${jsonb(input.answers)},
+            ${input.templateSlug || null}
           )
           returning *`;
         return created;
@@ -201,8 +227,8 @@ export const postgresStore: DataStore = {
     }
   },
 
-  async seedCaseDocuments(caseId, documentCodes) {
-    if (!documentCodes.length) return { ok: true, data: [] };
+  async seedCaseDocuments(caseId, documents) {
+    if (!documents.length) return { ok: true, data: [] };
     try {
       const sql = getSql();
       const agencyId = await getAgencyId();
@@ -210,8 +236,9 @@ export const postgresStore: DataStore = {
       if (!id) return { ok: false, error: 'Case not found' };
       await sql`
         insert into case_documents (agency_id, case_id, document_code, required, status)
-        select ${agencyId}, ${id}, code, true, 'not-uploaded' from unnest(${documentCodes}::text[]) as code`;
-      return { ok: true, data: documentCodes };
+        select ${agencyId}, ${id}, d.code, d.required, 'not-uploaded'
+        from jsonb_to_recordset(${jsonb(documents)}) as d(code text, required boolean)`;
+      return { ok: true, data: documents.map((d) => d.code) };
     } catch (error) {
       return fail(error, 'Failed to seed case documents');
     }
@@ -306,6 +333,164 @@ export const postgresStore: DataStore = {
     } catch (error) {
       fail(error, 'Failed to list uploads');
       return [];
+    }
+  },
+
+  async getUpload(uploadId) {
+    if (!UUID_RE.test(uploadId)) return undefined;
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      const [row] = await sql`
+        select u.*, c.case_number from uploads u join cases c on c.id = u.case_id
+        where u.agency_id = ${agencyId} and u.id = ${uploadId}`;
+      if (!row) return undefined;
+      return {
+        id: String(row.id),
+        caseId: String(row.case_number),
+        documentCode: String(row.document_code),
+        fileName: String(row.file_name),
+        path: String(row.path),
+        uploadedAt: iso(row.uploaded_at) || '',
+      };
+    } catch (error) {
+      fail(error, 'Failed to load upload');
+      return undefined;
+    }
+  },
+
+  async listTemplates() {
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      const rows = await sql`select * from onboarding_templates where agency_id = ${agencyId} order by created_at asc`;
+      return { ok: true, data: rows.map(mapTemplate) };
+    } catch (error) {
+      return fail(error, 'Failed to list templates');
+    }
+  },
+
+  async getTemplate(slug) {
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      const [row] = await sql`select * from onboarding_templates where agency_id = ${agencyId} and slug = ${slug}`;
+      return { ok: true, data: row ? mapTemplate(row) : null };
+    } catch (error) {
+      return fail(error, 'Failed to load template');
+    }
+  },
+
+  async saveTemplate(template) {
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      const [row] = await sql`
+        insert into onboarding_templates (agency_id, slug, name, name_he, description, steps, required_assets, contract, active, updated_at)
+        values (${agencyId}, ${template.slug}, ${template.name}, ${template.nameHe}, ${template.description || null},
+                ${jsonb(template.steps)}, ${jsonb(template.documents)},
+                ${jsonb(template.contract)}, ${template.active}, now())
+        on conflict (agency_id, slug) do update set
+          name = excluded.name, name_he = excluded.name_he, description = excluded.description,
+          steps = excluded.steps, required_assets = excluded.required_assets, contract = excluded.contract,
+          active = excluded.active, updated_at = now()
+        returning *`;
+      return { ok: true, data: mapTemplate(row) };
+    } catch (error) {
+      return fail(error, 'Failed to save template');
+    }
+  },
+
+  async deleteTemplate(slug) {
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      await sql`delete from onboarding_templates where agency_id = ${agencyId} and slug = ${slug}`;
+      return { ok: true, data: { slug } };
+    } catch (error) {
+      return fail(error, 'Failed to delete template');
+    }
+  },
+
+  async saveContractSignature(caseId, signature) {
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      const id = await caseUuid(caseId);
+      if (!id) return { ok: false, error: 'Case not found' };
+      const [row] = await sql`
+        insert into contract_signatures (
+          agency_id, case_id, template_slug, contract_title, contract_body, content_hash,
+          signer_name, signature_image, ip, user_agent
+        ) values (
+          ${agencyId}, ${id}, ${signature.templateSlug || null}, ${signature.contractTitle}, ${signature.contractBody},
+          ${signature.contentHash}, ${signature.signerName}, ${signature.signatureImage},
+          ${signature.ip || null}, ${signature.userAgent || null}
+        )
+        returning id`;
+      return { ok: true, data: { id: String(row.id) } };
+    } catch (error) {
+      return fail(error, 'Failed to save signature');
+    }
+  },
+
+  async listContractSignatures(caseId) {
+    try {
+      const sql = getSql();
+      const id = await caseUuid(caseId);
+      if (!id) return { ok: true, data: [] };
+      const rows = await sql`select * from contract_signatures where case_id = ${id} order by signed_at desc`;
+      return {
+        ok: true,
+        data: rows.map((row): ContractSignature => ({
+          id: String(row.id),
+          caseId,
+          templateSlug: (row.template_slug as string) || undefined,
+          contractTitle: String(row.contract_title),
+          contractBody: String(row.contract_body),
+          contentHash: String(row.content_hash),
+          signerName: String(row.signer_name),
+          signatureImage: String(row.signature_image),
+          ip: (row.ip as string) || undefined,
+          userAgent: (row.user_agent as string) || undefined,
+          signedAt: iso(row.signed_at) || '',
+        })),
+      };
+    } catch (error) {
+      return fail(error, 'Failed to list signatures');
+    }
+  },
+
+  async getBranding() {
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      const [row] = await sql`select name, name_he, logo_url, primary_color from agencies where id = ${agencyId}`;
+      return {
+        ok: true,
+        data: {
+          name: (row?.name as string) || undefined,
+          nameHe: (row?.name_he as string) || undefined,
+          logoUrl: (row?.logo_url as string) || undefined,
+          primaryColor: (row?.primary_color as string) || undefined,
+        },
+      };
+    } catch (error) {
+      return fail(error, 'Failed to load branding');
+    }
+  },
+
+  async saveBranding(branding) {
+    try {
+      const sql = getSql();
+      const agencyId = await getAgencyId();
+      await sql`
+        update agencies set name = ${branding.name}, name_he = ${branding.nameHe || null},
+          logo_url = ${branding.logoUrl || null}, primary_color = ${branding.primaryColor || null}
+        where id = ${agencyId}`;
+      return { ok: true, data: branding };
+    } catch (error) {
+      return fail(error, 'Failed to save branding');
     }
   },
 

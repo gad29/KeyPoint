@@ -2,8 +2,10 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import type { BankOffer, CaseRecord, CaseStage } from '@/data/domain';
 import { env, hasLiveDataStore, hasN8nConfig } from '@/lib/env';
-import { getStore, type CaseContactInput } from '@/lib/data';
+import { getStore, type CaseContactInput, type SeedDocument } from '@/lib/data';
 import { getActivePreset } from '@/lib/presets';
+import { getDocumentLabels, resolveTemplate } from '@/lib/onboarding';
+import type { DocumentRequirement } from '@/data/domain';
 import { postJson, triggerN8n } from '@/lib/n8n';
 import type { CaseUpdateInput, CreateBankOfferInput, CreateCaseInput, PortalInvite, UploadRecord } from '@/lib/types';
 
@@ -27,20 +29,21 @@ function signInvitePayload(encodedPayload: string) {
   return crypto.createHmac('sha256', env.portalInviteSecret).update(encodedPayload).digest('base64url');
 }
 
+type InviteTokenPayload = { caseId: string; expiresAt: string };
+
+/** The payload is readable (base64), so it carries no personal data: just the case and expiry, signed. */
 function makeInviteToken(caseRecord: CaseRecord) {
-  const payload = {
+  const payload: InviteTokenPayload = {
     caseId: caseRecord.id,
-    leadName: caseRecord.leadName,
-    phone: caseRecord.phone,
     expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
-  } satisfies Omit<PortalInvite, 'token'>;
+  };
 
   const encodedPayload = base64url(JSON.stringify(payload));
   const signature = signInvitePayload(encodedPayload);
   return `${encodedPayload}.${signature}`;
 }
 
-function parseInviteToken(token: string): Omit<PortalInvite, 'token'> | null {
+function parseInviteToken(token: string): InviteTokenPayload | null {
   const [encodedPayload, signature] = token.split('.');
   if (!encodedPayload || !signature) return null;
 
@@ -50,13 +53,23 @@ function parseInviteToken(token: string): Omit<PortalInvite, 'token'> | null {
   if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return null;
 
   try {
-    const payload = JSON.parse(decodeBase64url(encodedPayload)) as Omit<PortalInvite, 'token'>;
-    if (!payload.caseId || !payload.leadName || !payload.phone || !payload.expiresAt) return null;
+    const payload = JSON.parse(decodeBase64url(encodedPayload)) as Partial<InviteTokenPayload>;
+    if (!payload.caseId || !payload.expiresAt) return null;
     if (new Date(payload.expiresAt).getTime() < Date.now()) return null;
-    return payload;
+    return { caseId: payload.caseId, expiresAt: payload.expiresAt };
   } catch {
     return null;
   }
+}
+
+/** Personal client link (progress + uploads). Stateless and signed; valid for 30 days. */
+export function issueClientLink(caseRecord: CaseRecord) {
+  const token = makeInviteToken(caseRecord);
+  return { token, url: `${env.keypointAppBaseUrl.replace(/\/$/, '')}/progress/${token}` };
+}
+
+export function caseIdFromClientToken(token: string): string | null {
+  return parseInviteToken(token)?.caseId ?? null;
 }
 
 function getStageSummary(stage: CaseStage) {
@@ -221,7 +234,7 @@ export async function createCase(input: CreateCaseInput) {
 export interface CreateIntakeCaseInput extends CreateCaseInput {
   answers?: unknown;
   contacts: CaseContactInput[];
-  requiredDocumentCodes: string[];
+  documents: SeedDocument[];
 }
 
 /**
@@ -231,7 +244,8 @@ export interface CreateIntakeCaseInput extends CreateCaseInput {
  */
 export async function createIntakeCase(input: CreateIntakeCaseInput) {
   const store = getStore();
-  const { contacts, requiredDocumentCodes, ...caseInput } = input;
+  const { contacts, documents, ...caseInput } = input;
+  const requiredDocumentCodes = documents.filter((d) => d.required).map((d) => d.code);
   const created = await store.createCase({
     ...caseInput,
     missingItemsCount: requiredDocumentCodes.length,
@@ -253,7 +267,7 @@ export async function createIntakeCase(input: CreateIntakeCaseInput) {
     else warnings.push(result.error || 'Contact creation failed');
   }
 
-  const seeded = await store.seedCaseDocuments(caseId, requiredDocumentCodes);
+  const seeded = await store.seedCaseDocuments(caseId, documents);
   if (!seeded.ok) warnings.push(seeded.error || 'Document checklist seeding failed');
 
   const activity = await store.logActivity(caseId, 'intake_received', 'Intake captured and case seeded', 'system');
@@ -311,16 +325,46 @@ export async function setCaseStage(caseId: string, stage: CaseStage) {
   return updateCase(caseId, { stage });
 }
 
-export async function getCaseChecklist(caseId: string) {
+export type ChecklistItem = DocumentRequirement & { required: boolean };
+
+/**
+ * Document checklist for a case. Mortgage preset: its rule-based library. Other presets: the
+ * documents seeded at intake (source of truth), falling back to the case's template.
+ */
+export async function getCaseChecklist(caseId: string): Promise<ChecklistItem[]> {
   const caseRecord = await getCase(caseId);
   if (!caseRecord) return [];
 
-  const library = getActivePreset().documentLibrary ?? [];
-  return library.map((doc) => ({
-    ...doc,
-    required:
-      (!doc.caseTypes || doc.caseTypes.includes(caseRecord.caseType)) &&
-      (!doc.borrowerProfiles || doc.borrowerProfiles.some((profile) => caseRecord.borrowerProfiles.includes(profile))),
+  const library = getActivePreset().documentLibrary;
+  if (library?.length) {
+    return library.map((doc) => ({
+      ...doc,
+      required:
+        (!doc.caseTypes || doc.caseTypes.includes(caseRecord.caseType)) &&
+        (!doc.borrowerProfiles || doc.borrowerProfiles.some((profile) => caseRecord.borrowerProfiles.includes(profile))),
+    }));
+  }
+
+  const [rows, template, labels] = await Promise.all([
+    listCaseDocuments(caseId),
+    resolveTemplate(caseRecord.templateSlug),
+    getDocumentLabels(),
+  ]);
+  const templateDocs = template?.documents ?? [];
+  const source = rows.length
+    ? rows.map((row) => ({
+        code: row.documentCode,
+        required: row.required ?? templateDocs.find((d) => d.code === row.documentCode)?.required ?? true,
+      }))
+    : templateDocs.map((d) => ({ code: d.code, required: d.required }));
+
+  return source.map(({ code, required }) => ({
+    code,
+    group: 'Documents',
+    labelEn: labels[code]?.en ?? (code === 'other' ? 'Other file' : code),
+    labelHe: labels[code]?.he ?? (code === 'other' ? 'קובץ נוסף' : code),
+    description: '',
+    required,
   }));
 }
 
@@ -338,7 +382,7 @@ export async function createInvite(caseId: string): Promise<PortalInvite> {
   }
   await safeActivityLog(caseId, 'portal-invite-generated', 'Client progress link generated');
 
-  return { token, ...parsed };
+  return { token, ...parsed, leadName: caseRecord.leadName, phone: caseRecord.phone };
 }
 
 export async function getInvite(token: string): Promise<PortalInvite | undefined> {

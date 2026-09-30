@@ -6,6 +6,7 @@ import type { BankOffer, CaseRecord, CaseStage, DocumentRequirement } from '@/da
 import { CaseTimeline } from '@/components/case-timeline';
 import { CaseDocuments } from '@/components/case-documents';
 import { InviteGenerator } from '@/components/forms/invite-generator';
+import { ContractSummary } from '@/components/onboarding/contract-summary';
 import type { PresetFeatures, PresetId } from '@/lib/presets';
 import { GENERIC_STAGE_KEYS, STAGE_LABELS_HE } from '@/lib/stage-labels';
 
@@ -431,6 +432,7 @@ export function CaseDetailPage({ caseRecord, initialOffers, checklist, presetId,
               )}
             </div>
           </div>
+          <ContractSummary caseId={caseData.id} />
           <InviteGenerator caseId={caseData.id} />
         </div>
       )}

@@ -27,10 +27,12 @@ const copy = {
 
 export function UploadForm({
   caseId,
+  token,
   defaultDocumentCode = 'id-card',
   allowedDocumentCodes,
 }: {
   caseId: string;
+  token?: string;
   defaultDocumentCode?: string;
   allowedDocumentCodes?: string[];
 }) {
@@ -48,6 +50,7 @@ export function UploadForm({
       setStatus(t.uploading);
       form.set('caseId', caseId);
       form.set('documentCode', documentCode);
+      if (token) form.set('token', token);
       const res = await fetch('/api/uploads', { method: 'POST', body: form });
       const json = await res.json();
       setStatus(json.ok ? t.saved : json.error || t.failed);
@@ -55,7 +58,7 @@ export function UploadForm({
         setFileName('');
       }
     },
-    [caseId, documentCode, t.failed, t.saved, t.uploading],
+    [caseId, token, documentCode, t.failed, t.saved, t.uploading],
   );
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
